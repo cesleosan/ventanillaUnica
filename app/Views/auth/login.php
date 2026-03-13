@@ -49,16 +49,16 @@
                     <div class="bg-[#FCF7F9] p-4 rounded-2xl border border-[#E6D4DD]">
                         <label class="block text-[9px] font-black text-tlalpan-accent uppercase mb-3 text-center tracking-tighter">Verificación de Seguridad</label>
                         <div class="flex flex-col sm:flex-row items-center gap-3">
-                            <div class="relative cursor-pointer overflow-hidden rounded-xl bg-white border border-[#E6D4DD] w-full sm:w-auto" onclick="window.location.reload();">
+                            <div class="relative cursor-pointer overflow-hidden rounded-xl bg-white border border-[#E6D4DD] w-full sm:w-[140px] h-12 flex-shrink-0" onclick="window.location.reload();">
                                 <?php if (!empty($data['captcha_image'])): ?>
-                                    <img src="<?= $data['captcha_image'] ?>" alt="CAPTCHA" class="h-12 w-full sm:w-32 object-cover">
+                                    <img src="<?= $data['captcha_image'] ?>" alt="CAPTCHA" class="h-full w-full object-fill block">
                                     <div class="absolute inset-0 bg-tlalpan-vino/5 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
                                         <svg class="w-5 h-5 text-tlalpan-vino" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                     </div>
                                 <?php endif; ?>
                             </div>
                             <input type="text" name="captcha" placeholder="CÓDIGO" 
-                                class="w-full sm:flex-1 bg-white border border-[#E6D4DD] rounded-xl px-4 py-3 text-center font-mono font-black text-lg text-tlalpan-vino focus:border-tlalpan-vino outline-none tracking-widest uppercase">
+                                class="w-full sm:flex-1 bg-white border border-[#E6D4DD] rounded-xl px-4 py-3 text-center font-mono font-black text-lg text-tlalpan-vino focus:border-tlalpan-vino outline-none tracking-widest uppercase h-12">
                         </div>
                     </div>
 
