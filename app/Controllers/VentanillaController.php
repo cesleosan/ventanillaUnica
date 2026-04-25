@@ -7,7 +7,7 @@ class VentanillaController {
     private function getCatalogoTramites() {
         return [
             'Protección Civil' => [
-                'Autorización para la instalación y quema de pirotecnia y efectos especiales' => [
+                'Autorización para la instalación y quema de pirotecnia y efectos especiales' => [ //check
                     'tipo_captura' => 'predio',
                     'requisitos' => [
                     'Formato TTLALPAN_AIQ_1 debidamente requisitado (Original y copia)',
@@ -36,7 +36,7 @@ class VentanillaController {
                 ]
             ],
             'Via Pública' => [
-                'Permiso para ejercer actividades comerciales en Romerías en Vía Pública' => [
+                'Permiso para ejercer actividades comerciales en Romerías en Vía Pública' => [ //check
                     'requisitos' => [
                     'Formato TTLALPAN_PRVP_1, por duplicado debidamente requisitados, con firmas autógrafas.',
                     'Identificación oficial de la persona interesada (Credencial para votar, Pasaporte, Cédula Profesional o Cartilla del Servicio Militar Nacional). (Original y copia para cotejo)',
@@ -62,7 +62,8 @@ class VentanillaController {
                 ]
             ],
             'Giros Mercantiles' => [
-                'Autorización, aviso o permiso para la celebración de espectáculos públicos' => [
+                //Autorización, aviso o permiso
+                'Autorización, aviso o permiso para la celebración de espectáculos públicos' => [ //check
                     'requisitos' => [
                     'Formato de solicitud TTLALPAN_AAPP_1 debidamente requisitado (Original y copia)',
                     'Identificación Oficial del solicitante (Original y copia para cotejo)',
@@ -221,6 +222,7 @@ class VentanillaController {
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ],
+                //Nuevo o reexpedición
                 'Cédula de empadronamiento para ejercer actividades comerciales en mercados públicos o su Reexpedición' => [
                     'requisitos' => [
                     'Formato TTLALPAN_REE_1 debidamente requisitado. (Original y copia)',
@@ -331,6 +333,7 @@ class VentanillaController {
             ],
             'Servicios Legales' => [
                 'Expedición de copias certificadas que obren en los archivos de la Delegación' => [
+                    'tipo_captura' => 'servicios_legales',
                     'requisitos' => [
                     'Formato TTLALPAN_ECC_1 debidamente requisitado. (Original y copia)',
                     'Documentos de identificación oficial. (Original y copia para cotejo)',
@@ -348,6 +351,7 @@ class VentanillaController {
                     ]
                 ],
                 'Expedición de Certificado de Residencia' => [
+                    'tipo_captura' => 'servicios_legales',
                     'requisitos' => [
                     'Formato de solicitud TTLALPAN_ECR_1, debidamente requisitado. (Original y copia)',
                     'Documentos de identificación oficial. (Original y copia para cotejo)',
@@ -372,6 +376,7 @@ class VentanillaController {
                 ],
 
                 'Solicitud de Visita de Verificación Administrativa' => [
+                    'tipo_captura' => 'predio',
                     'requisitos' => [
                         'Formato TTLALPAN_SVV_1 debidamente requisitado. (Original y copia)',
                         'Identificación Oficial Persona Física: Credencial para votar o Cédula profesional o Cartilla del Servicio Militar Nacional o Pasaporte o Carta de Naturalización. (Original y copia para cotejo)',
@@ -408,7 +413,7 @@ class VentanillaController {
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ],
-                'Registro de Manifestación de Construcción Tipo A' => [
+                /*'Registro de Manifestación de Construcción Tipo A' => [
                     'requisitos' => [
                     'Formato TTLALPAN_RMC_3 debidamente requisitado',
                     'Identificación oficial con fotografía',
@@ -424,8 +429,9 @@ class VentanillaController {
                         'en_linea' => 'Sí. en: https://ventanilla.construccion.cdmx.gob.mx',
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
-                ],
+                ],*/
                 'Licencia de Anuncios Denominativos en Inmuebles ubicados en Vías Secundarias' => [
+                    'tipo_captura' => 'predio',
                     'requisitos' => [
                         'Formato TTLALPAN_LAD_1 debidamente requisitado. Original y copia Tratándose de persona física, identificación oficial vigente con fotografía (credencial para votar, pasaporte, licencia de conducir, Cartilla del Servicio Militar Nacional o cédula profesional). Original y copia para cotejo.',
                         'Podrá realizar el trámite una persona acreditada con carta poder firmada ante dos testigos, presentando su identificación oficial vigente con fotografía (cualquiera de las señaladas) y de la persona interesada. Original y copia para cotejo En caso de que se acredite a una persona distinta para oír y recibir notificaciones, también deberá presentar identificación oficial vigente con fotografía (cualquiera de las señaladas). Original y copia para cotejo',
@@ -480,6 +486,7 @@ class VentanillaController {
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ],
+                // Nuevo o Revalidación
                 'Visto Bueno de Seguridad y Operación de las Instalaciones y su Renovación' => [
                     'requisitos' => [
                     'Formato TTLALPAN_RVB_1, en dos tantos originales debidamente requisitado, con firmas autógrafas.',
@@ -505,6 +512,7 @@ class VentanillaController {
                     ]
                 ],
                 'Expedición de Licencia de Construcción Especial. Revalidación de la Licencia de Construcción Especial y Aviso de Terminación de Obra o Autorización de Uso y Ocupación, en su caso' => [
+                    'tipo_captura' => 'predio',
                     'requisitos' => [
                     'Formato TTLALPAN_LCE_1, en dos tantos originales debidamente requisitados, con firmas autógrafas.',
                     'Identificación oficial con fotografía (credencial para votar o licencia para conducir o cartilla del servicio militar nacional o pasaporte o cédula profesional o carta de naturalización o certificado de nacionalidad mexicana) Original y copia.',
@@ -582,6 +590,7 @@ class VentanillaController {
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ],
+                //Nuevo o Revalidación
                 'Expedición de Licencia de Subdivisión, Fusión y Revalidación.' => [
                     'requisitos' => [
                     'Formato TTLALPAN_ELS_1 en dos tantos originales debidamente requisitados, con firmas autógrafas.',
@@ -606,6 +615,7 @@ class VentanillaController {
                     ]
                 ],
                 'Registro de Constancia de Verificación de Seguridad Estructural y su Renovación' => [
+                    'tipo_captura' => 'predio',
                     'requisitos' => [
                     'Formato TTLALPAN_CSE_1, en dos tantos originales debidamente requisitados, con firmas autógrafas.',
                     'Tratándose de persona física, identificación oficial vigente con fotografía (credencial para votar, pasaporte, licencia de conducir, Cartilla del Servicio Militar Nacional o cédula profesional). Copia simple y original para cotejo. Podrá realizar el trámite una persona acreditada con carta poder firmada ante dos testigos, presentando su identificación oficial vigente con fotografía (cualquiera de las señaladas) y de la persona interesada. Copia simple y original para cotejo. En caso de que se acredite a una persona distinta para oír y recibir notificaciones, también deberá presentar identificación oficial vigente con fotografía (cualquiera de las señaladas). Copia simple y original para cotejo.',
@@ -621,7 +631,9 @@ class VentanillaController {
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ],
+                //NUEVO, REVALIDACION, AVISO DE TERMINO DE OBRA
                 'Registro de Manifestación de Construcción Tipo A, revalidación del registro y aviso de terminación de obra' => [
+                    'tipo_captura' => 'predio',
                     'requisitos' => [
                     'Formato TTLALPAN_RMC_3, en dos tantos originales, debidamente requisitados, con firmas autógrafas.',
                     'Identificación oficial con fotografía (carta de naturalización o cartilla de servicio militar nacional o cédula profesional o pasaporte o certificado de nacionalidad mexicana o credencial para votar o licencia para conducir) (Original y copia para cotejo). Persona física',
@@ -683,6 +695,7 @@ class VentanillaController {
                     ]
                 ],
                 'Registro de Obra Ejecutada' => [
+                    'tipo_captura' => 'predio',
                     'requisitos' => [
                     'Formato TTLALPAN_ROE_1, en dos tantos originales debidamente requisitados y con firmas autógrafas.',
                     'Identificación oficial con fotografía (carta de naturalización o cartilla de servicio militar nacional o cédula profesional o pasaporte o certificado de nacionalidad mexicana o credencial para votar o licencia para conducir) (Original y copia).',
@@ -721,7 +734,9 @@ class VentanillaController {
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ],
+                //Demolicion, suelo de conservacion, fusion/subdivision
                 'Constancia de Publicitación Vecinal para Construcciones que Requieren Registro de Manifestación Tipo B o C, Licencias Especiales' => [
+                    'tipo_captura' => 'predio',
                     'requisitos' => [
                     'Formato TTLALPAN_CPV_1 debidamente requisitado. (Original y copia)',
                     'Identificación oficial vigente (credencial para votar, pasaporte, licencia de conducir, Cartilla del Servicio Militar Nacional o cédula profesional) de las personas: solicitante, su representante legal y acreditada para oír y recibir notificaciones, en su caso. (Original y copia para cotejo)',
@@ -749,6 +764,7 @@ class VentanillaController {
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ]
+                
             ]
         ];
     }

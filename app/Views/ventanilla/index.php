@@ -108,22 +108,99 @@
 
 <div class="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden animate-fade-in-up mb-10">
     
-    <div class="bg-gray-50/80 px-8 py-5 border-b border-gray-100 flex flex-wrap gap-8 items-center">
-        <h3 class="font-black text-tlalpan-vino text-lg uppercase tracking-tight">Datos de Captura</h3>
-        
-        <div class="flex items-center gap-3">
-            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Persona:</span>
-            <select id="select-tipo-persona" onchange="cambiarOpcionesRepresentante(); actualizarPlantillaInteresado();" class="input-tlalpan text-xs font-bold rounded-lg py-1.5 px-4">
-                <option value="fisica">FISICA</option>
-                <option value="moral">MORAL</option>
+    <div class="bg-gray-50/80 px-8 py-4 border-b border-gray-100 flex flex-wrap items-center gap-x-8 gap-y-4">
+    <h3 class="font-black text-tlalpan-vino text-lg uppercase tracking-tight">Datos de Captura</h3>
+
+    <div class="flex items-center gap-3">
+        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Persona:</span>
+        <select id="select-tipo-persona" onchange="cambiarOpcionesRepresentante(); actualizarPlantillaInteresado();" class="input-tlalpan text-xs font-bold rounded-lg py-1.5 px-4">
+            <option value="fisica">FISICA</option>
+            <option value="moral">MORAL</option>
+        </select>
+    </div>
+
+    <div class="flex items-center gap-3">
+        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Representante:</span>
+        <select id="select-tipo-rep" onchange="actualizarPlantillaInteresado()" class="input-tlalpan text-xs font-bold rounded-lg py-1.5 px-4"></select>
+    </div>
+
+    <div id="contenedor-tipo-obra" class="flex items-center gap-3 hidden animate-fade-in">
+        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modalidad:</span>
+        <select id="select-modalidad-obra" class="input-tlalpan text-xs font-bold rounded-lg py-1.5 px-4 border-blue-200 text-blue-700 bg-blue-50/50">
+            <option value="TIPO B">Tipo B</option>
+            <option value="TIPO C">Tipo C</option>
+            <option value="DEMOLICION">Demolición</option>
+            <option value="FUSION_SUBDIVISION">Fusión y/o subdivisión</option>
+            <option value="SUELO_CONSERVACION">Suelo de conservación</option>
+        </select>
+    </div>
+
+    <div id="contenedor-tipo-licencia" class="flex flex-wrap items-center gap-4 hidden animate-fade-in">
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Modalidad:</span>
+            <select id="select-modalidad-licencia" class="input-tlalpan text-[11px] font-black rounded-lg py-1.5 px-4 border-amber-200 text-amber-800 bg-amber-50">
+                <option value="EXPEDICION">Expedición de Licencia de Construcción Especial</option>
+                <option value="REVALIDACION">Revalidación de la Licencia de Construcción Especial</option>
+                <option value="AVISO_TERMINACION">Aviso de Terminación de Obra</option>
+                <option value="AUTORIZACION_USO_OCUPACION">Autorización de Uso y Ocupación</option>
             </select>
         </div>
-        <div class="flex items-center gap-3">
-            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Representante:</span>
-            <select id="select-tipo-rep" onchange="actualizarPlantillaInteresado()" class="input-tlalpan text-xs font-bold rounded-lg py-1.5 px-4">
-                </select>
+        <div class="flex items-center gap-2">
+            <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Obra:</span>
+            <select id="select-obra-especial" class="input-tlalpan text-[11px] font-bold rounded-lg py-1.5 px-3 border-amber-300 text-amber-900 bg-white shadow-sm max-w-[400px]">
+                <option value="-1">Seleccione tipo de obra...</option>
+                <option value="SUELO_CONSERVACION">Suelo de conservación</option>
+                <option value="INSTALACIONES">Instalaciones subterráneas, aéreas, cortes en banquetas</option>
+                <option value="ANTENAS">Estaciones repetidoras (Antenas)</option>
+                <option value="DEMOLICIONES">Demoliciones mayores a 60m2</option>
+                <option value="EXCAVACIONES_OTROS">Excavaciones, tapiales, instalaciones temporales, ferias o aparatos mecánicos, circos, carpas, modificaciones en edificaciones existentes, montacargas o cualquier aparato mecánico, equipos contra incendio, tanques de almacenamiento, instalación de máquina con o sin plataforma</option>
+            </select>
         </div>
     </div>
+
+    <div id="contenedor-tipo-manifestacion-a" class="flex flex-wrap items-center gap-4 hidden animate-fade-in">
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modalidad:</span>
+            <select id="select-modalidad-manifestacion-a" class="input-tlalpan text-[11px] font-black rounded-lg py-1.5 px-4 border-emerald-200 text-emerald-800 bg-emerald-50">
+                <option value="REGISTRO">Registro de Manifestación de Construcción Tipo A</option>
+                <option value="REVALIDACION">Revalidación del registro</option>
+                <option value="AVISO_TERMINACION">Aviso de terminación de obra</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo:</span>
+            <select id="select-detalle-manifestacion-a" class="input-tlalpan text-[11px] font-black rounded-lg py-1.5 px-4 border-emerald-300 text-emerald-900 bg-white shadow-sm">
+                <option value="-1">Tipo de manifestación</option>
+                <option value="1">Obra nueva</option>
+                <option value="2">Ampliación</option>
+                <option value="3">Reparación</option>
+                <option value="4">Bardas</option>
+                <option value="5">Fosas Séptica o Cisterna</option>
+                <option value="6">Modificación</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="contenedor-tipo-manifestacion-bc" class="flex items-center gap-3 hidden animate-fade-in">
+        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modalidad:</span>
+        <select id="select-modalidad-manifestacion-bc" class="input-tlalpan text-[11px] font-black rounded-lg py-1.5 px-4 border-indigo-200 text-indigo-800 bg-indigo-50">
+            <option value="REGISTROB">Registro de Manifestación de Construcción Tipo B</option>
+            <option value="REGISTROC">Registro de Manifestación de Construcción Tipo C</option>
+            <option value="REVALIDACION">Revalidación del registro</option>
+            <option value="AVISO_TERMINACION">Aviso de terminación de obra</option>
+            <option value="USO_OCUPACION">Uso y Ocupación</option>
+        </select>
+    </div>
+
+    <div id="contenedor-tipo-espectaculos-publicos" class="flex items-center gap-3 hidden animate-fade-in">
+        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modalidad:</span>
+        <select id="select-modalidad-espectaculos-publicos" class="input-tlalpan text-[11px] font-black rounded-lg py-1.5 px-4 border-indigo-200 text-indigo-800 bg-indigo-50">
+            <option value="AUTORIZACION">Autorización</option>
+            <option value="AVISO">Aviso</option>
+            <option value="PERMISO">Permiso</option>
+        </select>
+    </div>
+</div>
 
     <div class="border-b border-gray-100">
         <nav class="-mb-px flex space-x-8 px-8 overflow-x-auto custom-scrollbar" aria-label="Tabs">
@@ -372,25 +449,78 @@
         </div>
 
         <div id="tab-observaciones" class="tab-content hidden">
-            <div class="max-w-4xl mx-auto py-4">
-                <div class="mb-6 flex items-center gap-4">
-                    <div class="p-3 bg-tlalpan-vino/10 rounded-xl text-tlalpan-vino">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+    <div class="max-w-4xl mx-auto py-4 space-y-8">
+        
+        <div id="contenedor-recibos-dinamico" class="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 shadow-sm animate-fade-in hidden">
+            <div class="mb-4 flex items-center gap-3">
+                <div class="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="font-black text-gray-800 text-sm uppercase tracking-tight">Registro de Recibos</h3>
+                    <p class="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Ingrese los folios y montos correspondientes</p>
+                </div>
+            </div>
+
+           <div class="grid grid-cols-1 gap-4">
+                <div class="grid grid-cols-12 gap-4 items-center">
+                    <div class="col-span-8">
+                        <label for="folio_recibo_1" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Folio del Recibo</label>
+                        <input type="text" id="folio_recibo_1" name="folio_recibo_1" placeholder="No. Recibo" 
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-bold border-gray-200 focus:border-emerald-500">
                     </div>
-                    <div>
-                        <h3 class="font-black text-gray-800 text-xl uppercase tracking-tight">Bitácora de Observaciones</h3>
-                        <p class="text-xs text-gray-500 font-bold uppercase tracking-widest">Notas adicionales del capturista</p>
+                    <div class="col-span-4">
+                        <label for="monto_recibo_1" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Cantidad</label>
+                        <input type="number" id="monto_recibo_1" name="monto_recibo_1" step="0.01" value="0.00" 
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-black text-right border-gray-200 text-emerald-700">
                     </div>
                 </div>
-                <div class="relative group">
-                    <div class="absolute -inset-1 bg-gradient-to-r from-tlalpan-vino/20 to-transparent rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition"></div>
-                    <textarea 
-                        rows="12" 
-                        class="input-tlalpan relative w-full rounded-2xl p-6 text-gray-700 text-sm leading-relaxed resize-none shadow-sm outline-none"
-                        placeholder="Escriba aquí cualquier detalle relevante sobre el trámite o la documentación recibida..."></textarea>
+
+                <div class="grid grid-cols-12 gap-4 items-center">
+                    <div class="col-span-8">
+                        <label for="folio_recibo_2" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Folio del Recibo</label>
+                        <input type="text" id="folio_recibo_2" name="folio_recibo_2" placeholder="No. Recibo" 
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-bold border-gray-200 focus:border-emerald-500">
+                    </div>
+                    <div class="col-span-4">
+                        <label for="monto_recibo_2" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Cantidad</label>
+                        <input type="number" id="monto_recibo_2" name="monto_recibo_2" step="0.01" value="0.00" 
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-black text-right border-gray-200 text-emerald-700">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-12 gap-4 items-center">
+                    <div class="col-span-8">
+                        <label for="folio_recibo_3" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Folio del Recibo</label>
+                        <input type="text" id="folio_recibo_3" name="folio_recibo_3" placeholder="No. Recibo" 
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-bold border-gray-200 focus:border-emerald-500">
+                    </div>
+                    <div class="col-span-4">
+                        <label for="monto_recibo_3" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Cantidad</label>
+                        <input type="number" id="monto_recibo_3" name="monto_recibo_3" step="0.01" value="0.00" 
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-black text-right border-gray-200 text-emerald-700">
+                    </div>
                 </div>
             </div>
         </div>
+
+        <div class="space-y-4">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-tlalpan-vino/10 rounded-xl text-tlalpan-vino">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="font-black text-gray-800 text-xl uppercase tracking-tight">Bitácora de Observaciones</h3>
+                    <p class="text-xs text-gray-500 font-bold uppercase tracking-widest">Notas adicionales del capturista</p>
+                </div>
+            </div>
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-tlalpan-vino/20 to-transparent rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition"></div>
+                <textarea rows="8" class="input-tlalpan relative w-full rounded-2xl p-6 text-gray-700 text-sm leading-relaxed resize-none shadow-sm outline-none" placeholder="Escriba aquí cualquier detalle relevante..."></textarea>
+            </div>
+        </div>
+    </div>
+</div>
 
     </div>
 
@@ -660,27 +790,77 @@
         actualizarRequisitos();
     }
 
-    function actualizarRequisitos() {
-        const materia = selMateria.value;
-        const tramite = selTramite.value;
-        const dataTramite = catalogo[materia][tramite];
-        if (!dataTramite) return;
+function actualizarRequisitos() {
+    // 1. DEFINIR REFERENCIAS
+    const conObra = document.getElementById('contenedor-tipo-obra'); 
+    const conLic = document.getElementById('contenedor-tipo-licencia'); 
+    const conManA = document.getElementById('contenedor-tipo-manifestacion-a');
+    const conManBC = document.getElementById('contenedor-tipo-manifestacion-bc');
+    const conRecibos = document.getElementById('contenedor-recibos-dinamico');
+    const conEspectaculos = document.getElementById('contenedor-tipo-espectaculos-publicos');
 
-        const requisitos = dataTramite.requisitos ? dataTramite.requisitos : dataTramite;
+    // 2. RESET TOTAL (Limpieza Quirúrgica)
+    // Ocultamos todos los combos y la sección de recibos antes de evaluar nada
+    [conObra, conLic, conManA, conManBC, conRecibos, conEspectaculos].forEach(el => {
+        if (el) el.classList.add('hidden');
+    });
 
-        divReq.innerHTML = '';
-        divPres.innerHTML = ''; 
-        divPres.appendChild(placeholder); 
-        placeholder.style.display = 'block';
+    const materia = selMateria.value;
+    const tramite = selTramite.value;
 
+    // Si no hay trámite, salimos (ya está todo oculto por el paso anterior)
+    if (!tramite) return;
+
+    // Buscamos la data en el catálogo
+    const dataTramite = catalogo[materia] ? catalogo[materia][tramite] : null;
+    if (!dataTramite) return;
+
+    let esTramiteObra = false;
+    // Normalizamos el nombre para una búsqueda más segura (sin acentos/minúsculas)
+    const tramiteNormalizado = tramite.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // 3. ACTIVACIÓN DE COMBOS ESPECÍFICOS
+    if (tramite.includes("Publicitación Vecinal")) {
+        if (conObra) conObra.classList.remove('hidden');
+        esTramiteObra = true;
+    } 
+    else if (tramite.includes("Licencia de Construcción Especial")) {
+        if (conLic) conLic.classList.remove('hidden');
+        esTramiteObra = true;
+    }
+    else if (tramite.includes("Manifestación de Construcción Tipo A")) {
+        if (conManA) conManA.classList.remove('hidden');
+        esTramiteObra = true;
+    }
+    else if (tramite.includes("Manifestación de Construcción Tipo B") || 
+             tramite.includes("Manifestación de Construcción Tipo C")) {
+        if (conManBC) conManBC.classList.remove('hidden');
+        esTramiteObra = true;
+    }
+    // CORRECCIÓN: Detección flexible para Espectáculos Públicos
+    else if (tramiteNormalizado.includes("espectaculos publicos")) {
+        if (conEspectaculos) conEspectaculos.classList.remove('hidden');
+    }
+
+    // 4. MOSTRAR RECIBOS SOLO SI ES OBRA
+    if (esTramiteObra && conRecibos) {
+        conRecibos.classList.remove('hidden');
+    }
+
+    // --- 5. RENDERIZADO DE REQUISITOS ---
+    const requisitos = dataTramite.requisitos ? dataTramite.requisitos : dataTramite;
+    divReq.innerHTML = '';
+    divPres.innerHTML = ''; 
+    divPres.appendChild(placeholder); 
+    placeholder.style.display = 'block';
+
+    if (Array.isArray(requisitos)) {
         requisitos.forEach((req) => {
             let div = document.createElement('div');
             div.className = 'item-requisito flex items-start p-3 bg-white border border-gray-100 rounded-xl cursor-pointer hover:bg-gray-50 transition-all shadow-sm mb-2';
             div.innerHTML = `
                 <div class="mr-3 mt-0.5 text-gray-300 transition-colors flex-shrink-0 icono-req">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>
                 <span class="text-[11px] text-gray-600 font-bold leading-tight select-none">${req}</span>
             `;
@@ -690,23 +870,38 @@
             };
             divReq.appendChild(div);
         });
-
-        // Inyección Dinámica de Plantilla de Captura (Tab Predio/Mercado)
-        const tipo = dataTramite.tipo_captura || 'predio'; 
-        const contenedorCaptura = document.getElementById('contenedor-dinamico-captura');
-        const btnTabCaptura = document.getElementById('btn-predio'); 
-
-        if (contenedorCaptura && plantillasCaptura[tipo]) {
-            contenedorCaptura.innerHTML = plantillasCaptura[tipo];
-            if (btnTabCaptura) {
-                btnTabCaptura.innerText = (tipo === 'mercado') ? 'DATOS DEL MERCADO' : 'DATOS DEL PREDIO';
-            }
-        }
-
-        actualizarDetalles(dataTramite.detalles);
-        actualizarPlantillaInteresado(); // Sincroniza el tab del interesado
     }
 
+    // --- 6. GESTIÓN DE TABS (CERO DEFAULT PREDIO) ---
+    const tipo = dataTramite.tipo_captura; // Ya no hay || 'predio'
+    const contenedorCaptura = document.getElementById('contenedor-dinamico-captura');
+    const btnTabCaptura = document.getElementById('btn-predio'); 
+
+    // Solo habilitamos si el catálogo pide explícitamente predio o mercado
+    if (tipo === 'predio' || tipo === 'mercado') {
+        if (btnTabCaptura) {
+            btnTabCaptura.classList.remove('hidden'); 
+            btnTabCaptura.innerText = (tipo === 'mercado') ? 'DATOS DEL MERCADO' : 'DATOS DEL PREDIO';
+        }
+        if (contenedorCaptura && plantillasCaptura[tipo]) {
+            contenedorCaptura.innerHTML = plantillasCaptura[tipo];
+        }
+    } else {
+        // Para Protección Civil y otros que no tengan tipo_captura: OCULTAR TODO
+        if (btnTabCaptura) btnTabCaptura.classList.add('hidden'); 
+        if (contenedorCaptura) contenedorCaptura.innerHTML = ''; 
+
+        // Si el usuario estaba en la pestaña de ubicación, lo devolvemos a requisitos
+        const tabUbicacion = document.getElementById('tab-predio');
+        if (tabUbicacion && !tabUbicacion.classList.contains('hidden')) {
+            switchTab('requisitos');
+        }
+    }
+
+    // --- 7. ACTUALIZACIÓN FINAL ---
+    actualizarDetalles(dataTramite.detalles);
+    actualizarPlantillaInteresado();
+}
     function actualizarDetalles(detalles) {
         const seccion = document.getElementById('seccion-observaciones');
         if (!detalles) {
