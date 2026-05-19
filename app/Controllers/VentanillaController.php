@@ -1,8 +1,25 @@
-<?php
-// app/Controllers/VentanillaController.php
+<?php   
+
+use Dompdf\Dompdf;
+use Dompdf\Options;
 
 class VentanillaController {
-    
+private $db;
+
+    public function __construct() {
+        // 1. CARGAR CONFIGURACIÓN PRIMERO (Esto define DB_HOST, DB_USER, etc.)
+        require_once '../app/config/config.php';
+
+        // 2. CARGAR LIBRERÍAS Y MODELOS
+        require_once '../app/Libraries/Database.php';
+        require_once '../app/Models/Ventanilla.php';
+
+        // 3. INSTANCIAR
+        // Usamos la barra invertida \ porque las clases están en el espacio global
+        // y el controlador tiene el namespace App\Controllers
+        $database = new \Database(); 
+        $this->db = $database->getConnection();
+    }
     // Aquí simulamos la Base de Datos con la info de tu Word
     private function getCatalogoTramites() {
         return [
@@ -769,29 +786,1174 @@ class VentanillaController {
         ];
     }
 
-    public function index() {
-        if (session_status() === PHP_SESSION_NONE) session_start();
+   public function guardar() {
+    /**
+     * Guarda la solicitud completa recibida desde JS.
+     * Devuelve JSON limpio para que fetch() no falle.
+     */
 
-        // 1. Obtenemos todo el catálogo
+    ini_set('display_errors', 0);
+    error_reporting(E_ALL);
+
+    ob_start();
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    try {
+        if (!file_exists('../app/config/config.php')) {
+            throw new \Exception("Config no encontrado.");
+        }
+
+        require_once '../app/config/config.php';
+        require_once '../app/Libraries/Database.php';
+        require_once '../app/Models/Ventanilla.php';
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            throw new \Exception("Acceso no autorizado.");
+        }
+
+        $database = new \Database();
+        $dbConn = $database->getConnection();
+
+        if (!$dbConn) {
+            throw new \Exception("Fallo de conexión a la base de datos.");
+        }
+
+        $json = file_get_contents('php://input');
+
+        if (!$json || trim($json) === '') {
+            throw new \Exception("No se recibió información para guardar.");
+        }
+
+        $payload = json_decode($json, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception("JSON malformado: " . json_last_error_msg());
+        }
+
+        if (!is_array($payload)) {
+            throw new \Exception("El payload recibido no tiene formato válido.");
+        }
+
+        if (empty($payload['solicitud']['tramite'])) {
+            throw new \Exception("No se recibió el trámite de la solicitud.");
+        }
+
+        $modelo = new \Ventanilla($dbConn);
+        $resultado = $modelo->guardarSolicitudCompleta($payload);
+
+        if (empty($resultado['success'])) {
+            throw new \Exception($resultado['error'] ?? 'Error desconocido en el modelo.');
+        }
+
+        ob_clean();
+
+        echo json_encode([
+            'success' => true,
+            'folio'   => $resultado['folio'] ?? null,
+            'id'      => $resultado['id'] ?? null,
+            'message' => 'Solicitud registrada correctamente.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    } catch (\Throwable $e) {
+        ob_clean();
+
+        http_response_code(400);
+
+        error_log("ERROR EN VentanillaController::guardar(): " . $e->getMessage());
+
+        echo json_encode([
+            'success' => false,
+            'error'   => $e->getMessage()
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    ob_end_flush();
+    exit;
+}
+
+
+/**
+ * Genera el comprobante PDF dinámico.
+ */
+public function generarComprobante() {
+    /**
+     * Este buffer protege el PDF de warnings/notices que podrían romper
+     * el binario enviado por Dompdf.
+     */
+    ob_start();
+
+    $id_solicitud = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
+
+    if (!$id_solicitud) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        die("Error: referencia de solicitud inválida o no proporcionada.");
+    }
+
+    try {
+        require_once '../app/config/config.php';
+        require_once '../app/Libraries/Database.php';
+        require_once '../app/Models/Ventanilla.php';
+        require_once '../app/Libraries/dompdf/autoload.inc.php';
+
+        $database = new \Database();
+        $dbConnection = $database->getConnection();
+
+        if (!$dbConnection) {
+            throw new \Exception("No se pudo conectar con la base de datos.");
+        }
+
+        $modelo = new \Ventanilla($dbConnection);
+
+        $registro = $modelo->obtenerTodoParaPDF($id_solicitud);
+
+        if (!$registro || !is_array($registro)) {
+            throw new \Exception("La solicitud ID {$id_solicitud} no existe en los registros institucionales.");
+        }
+
+        /**
+         * Datos finales que usará acuse_pdf.php
+         */
+        $datos = $this->prepararDatosParaAcuse($registro);
+
+        error_log("=== DATOS FINALES PARA PDF ===");
+        error_log(print_r($datos, true));
+
+        /**
+         * Configuración de Dompdf.
+         * Uso clases totalmente calificadas para que no dependas de los use
+         * del encabezado del archivo.
+         */
+        $options = new \Dompdf\Options();
+
+        $projectRoot = realpath(__DIR__ . '/../../');
+
+        $options->set('isRemoteEnabled', true);
+        $options->set('defaultFont', 'Helvetica');
+        $options->set('isHtml5ParserEnabled', true);
+
+        if ($projectRoot) {
+            $options->set('chroot', $projectRoot);
+        }
+
+        $dompdf = new \Dompdf\Dompdf($options);
+
+        /**
+         * Limpiar cualquier salida anterior antes de renderizar la vista.
+         */
+        if (ob_get_length()) {
+            ob_clean();
+        }
+
+        /**
+         * Render de la vista.
+         * IMPORTANTE: usar require, no require_once.
+         */
+        $vistaPdf = '../app/Views/ventanilla/acuse_pdf.php';
+
+        if (!file_exists($vistaPdf)) {
+            throw new \Exception("No se encontró la vista del PDF: {$vistaPdf}");
+        }
+
+        require $vistaPdf;
+
+        /**
+         * Aquí nace $html.
+         */
+        $html = ob_get_clean();
+
+        /**
+         * Debug HTML.
+         */
+        $debugPath = __DIR__ . '/../../debug_acuse.html';
+        @file_put_contents($debugPath, $html);
+
+        error_log("HTML PDF LENGTH: " . strlen($html));
+
+        if (trim($html) === '') {
+            throw new \Exception("La vista acuse_pdf.php generó HTML vacío.");
+        }
+
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $folio = $datos['folio'] ?? $registro['folio'] ?? 'SIN_FOLIO';
+        $folio = preg_replace('/[^A-Z0-9_\-]/i', '_', (string)$folio);
+
+        $nombreArchivo = "Acuse_VUD_{$folio}.pdf";
+
+        $dompdf->stream($nombreArchivo, [
+            "Attachment" => false
+        ]);
+
+        exit;
+
+    } catch (\Throwable $e) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        error_log("ERROR EN VentanillaController::generarComprobante(): " . $e->getMessage());
+
+        die("Error crítico en la generación del comprobante: " . $e->getMessage());
+    }
+}
+
+
+/**
+ * Helper interno para obtener el primer valor válido de varios arrays/llaves.
+ */
+private function valDesde(array $sources, array $keys, $default = '') {
+    foreach ($sources as $source) {
+        if (!is_array($source)) {
+            continue;
+        }
+
+        foreach ($keys as $key) {
+            if (isset($source[$key]) && $source[$key] !== null && trim((string)$source[$key]) !== '') {
+                return trim((string)$source[$key]);
+            }
+        }
+    }
+
+    return $default;
+}
+
+
+/**
+ * Helper para convertir un valor a string seguro.
+ */
+private function limpiarValor($value, $default = '') {
+    if ($value === null) {
+        return $default;
+    }
+
+    if (is_array($value)) {
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    $value = trim((string)$value);
+
+    return $value === '' ? $default : $value;
+}
+
+
+/**
+ * Prepara un array 100% compatible con la vista del PDF.
+ *
+ * Convierte el payload anidado:
+ * - solicitud
+ * - bifurcacion
+ * - interesado
+ * - representante_legal
+ * - persona_autorizada
+ * - especificos
+ * - recibos
+ * - requisitos_validados
+ *
+ * en una estructura híbrida:
+ * - conserva arrays originales
+ * - genera aliases planos
+ * - genera REQ_1, REQ_2, etc.
+ * - genera aliases para predio, mercado, interesado y bifurcación
+ */
+private function prepararDatosParaAcuse(array $registro): array
+{
+    $payload = [];
+
+    if (isset($registro['payload']) && trim((string)$registro['payload']) !== '') {
+        $payload = json_decode($registro['payload'], true);
+
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+    }
+
+    /**
+     * Si obtenerTodoParaPDF() ya hizo array_merge($solicitud, $payload),
+     * también tomamos datos desde $registro como respaldo.
+     */
+    $solicitud = $payload['solicitud']
+        ?? ($registro['solicitud'] ?? []);
+
+    $bifurcacion = $payload['bifurcacion']
+        ?? ($registro['bifurcacion'] ?? []);
+
+    $interesado = $payload['interesado']
+        ?? ($registro['interesado'] ?? []);
+
+    $representanteLegal = $payload['representante_legal']
+        ?? ($registro['representante_legal'] ?? []);
+
+    $personaAutorizada = $payload['persona_autorizada']
+        ?? ($registro['persona_autorizada'] ?? []);
+
+    $especificos = $payload['especificos']
+        ?? ($registro['especificos'] ?? []);
+
+    $recibos = $payload['recibos']
+        ?? ($registro['recibos'] ?? []);
+
+    $firmas = $payload['firmas']
+        ?? ($registro['firmas'] ?? []);
+
+    $requisitosValidados = $payload['requisitos_validados']
+        ?? ($registro['requisitos_validados'] ?? []);
+
+    $observaciones = $payload['observaciones']
+        ?? ($registro['observaciones'] ?? '');
+
+    if (!is_array($solicitud)) $solicitud = [];
+    if (!is_array($bifurcacion)) $bifurcacion = [];
+    if (!is_array($interesado)) $interesado = [];
+    if (!is_array($representanteLegal)) $representanteLegal = [];
+    if (!is_array($personaAutorizada)) $personaAutorizada = [];
+    if (!is_array($especificos)) $especificos = [];
+    if (!is_array($recibos)) $recibos = [];
+    if (!is_array($requisitosValidados)) $requisitosValidados = [];
+
+    $intBase = $interesado['datos'] ?? [];
+    $intDin  = $interesado['datos_dinamicos'] ?? [];
+
+    if (!is_array($intBase)) $intBase = [];
+    if (!is_array($intDin)) $intDin = [];
+
+    /**
+     * Array final:
+     * - Primero registro
+     * - Luego solicitud
+     * - Luego interesado
+     * - Luego específicos y recibos
+     *
+     * Esto permite que la vista use llaves planas.
+     */
+    $datos = array_merge(
+        $registro,
+        $solicitud,
+        $intBase,
+        $intDin,
+        $especificos,
+        $recibos
+    );
+
+    /**
+     * Conservamos estructuras originales para el PDF dinámico nuevo.
+     */
+    $datos['payload'] = $payload;
+    $datos['solicitud'] = $solicitud;
+    $datos['bifurcacion'] = $bifurcacion;
+    $datos['interesado'] = $interesado;
+    $datos['representante_legal'] = $representanteLegal;
+    $datos['persona_autorizada'] = $personaAutorizada;
+    $datos['especificos'] = $especificos;
+    $datos['recibos'] = $recibos;
+    $datos['requisitos_validados'] = $requisitosValidados;
+    $datos['firmas'] = is_array($firmas) ? $firmas : [];
+
+    /**
+     * Encabezado.
+     */
+    $datos['META_TRAMITE_NOMBRE'] = $this->valDesde(
+        [$solicitud, $registro, $datos],
+        ['tramite', 'TRAMITE', 'nombre_tramite', 'META_TRAMITE_NOMBRE'],
+        'NO ESPECIFICADO'
+    );
+
+    $datos['META_MATERIA'] = $this->valDesde(
+        [$solicitud, $registro, $datos],
+        ['materia', 'MATERIA', 'META_MATERIA'],
+        'N/A'
+    );
+
+    $datos['fecha_creacion'] = $this->valDesde(
+        [$registro, $datos],
+        ['fecha_ingreso', 'fecha_creacion', 'created_at', 'FECHA_INGRESO'],
+        date('Y-m-d H:i:s')
+    );
+
+    $datos['OBSERVACIONES'] = $this->limpiarValor($observaciones, '');
+
+    /**
+     * Bifurcación plana.
+     */
+    $datos['BIFURCACION_CLAVE'] = $this->valDesde(
+        [$bifurcacion, $datos],
+        ['clave', 'CLAVE', 'BIFURCACION_CLAVE'],
+        ''
+    );
+
+    $datos['BIFURCACION_MODALIDAD'] = $this->valDesde(
+        [$bifurcacion, $datos],
+        ['modalidad', 'MODALIDAD', 'BIFURCACION_MODALIDAD'],
+        ''
+    );
+
+    $datos['BIFURCACION_MODALIDAD_TEXTO'] = $this->valDesde(
+        [$bifurcacion, $datos],
+        ['modalidad_texto', 'MODALIDAD_TEXTO', 'BIFURCACION_MODALIDAD_TEXTO'],
+        ''
+    );
+
+    $datos['BIFURCACION_DETALLE'] = $this->valDesde(
+        [$bifurcacion, $datos],
+        ['detalle', 'DETALLE', 'BIFURCACION_DETALLE'],
+        ''
+    );
+
+    $datos['BIFURCACION_DETALLE_TEXTO'] = $this->valDesde(
+        [$bifurcacion, $datos],
+        ['detalle_texto', 'DETALLE_TEXTO', 'BIFURCACION_DETALLE_TEXTO'],
+        ''
+    );
+
+    /**
+     * Interesado físico/moral.
+     */
+    $datos['INTERESADO_NOMBRES'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['INTERESADO_NOMBRES', 'INTERESADO_NOMBRE', 'NOMBRES'],
+        ''
+    );
+
+    $datos['INTERESADO_APE_PATERNO'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        [
+            'INTERESADO_APE_PATERNO',
+            'INTERESADO_PATERNO',
+            'INTERESADO_APELLIDO_PATERNO',
+            'APELLIDO_PATERNO'
+        ],
+        ''
+    );
+
+    $datos['INTERESADO_APE_MATERNO'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        [
+            'INTERESADO_APE_MATERNO',
+            'INTERESADO_MATERNO',
+            'INTERESADO_APELLIDO_MATERNO',
+            'APELLIDO_MATERNO'
+        ],
+        ''
+    );
+
+    $datos['INTERESADO_RFC'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['INTERESADO_RFC', 'RFC'],
+        ''
+    );
+
+    $datos['INTERESADO_TELEFONO'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['INTERESADO_TELEFONO', 'TELEFONO', 'MORAL_TELEFONO'],
+        ''
+    );
+
+    $datos['INTERESADO_EMAIL'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['INTERESADO_EMAIL', 'EMAIL', 'MORAL_EMAIL'],
+        ''
+    );
+
+    $datos['MORAL_RAZON_SOCIAL'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['MORAL_RAZON_SOCIAL', 'RAZON_SOCIAL'],
+        ''
+    );
+
+    $datos['MORAL_RFC'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['MORAL_RFC'],
+        ''
+    );
+
+    $datos['MORAL_TELEFONO'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['MORAL_TELEFONO'],
+        ''
+    );
+
+    $datos['MORAL_EMAIL'] = $this->valDesde(
+        [$intDin, $intBase, $datos],
+        ['MORAL_EMAIL'],
+        ''
+    );
+
+    /**
+     * Domicilio del interesado.
+     */
+    $datos['INTERESADO_ALCALDIA'] = $this->valDesde(
+        [$intBase, $datos],
+        ['INTERESADO_ALCALDIA', 'ALCALDIA', 'SELECT_ALCALDIA'],
+        ''
+    );
+
+    $datos['INTERESADO_COLONIA'] = $this->valDesde(
+        [$intBase, $datos],
+        ['INTERESADO_COLONIA', 'COLONIA_NOMBRE', 'SELECT_COLONIA', 'COLONIA'],
+        ''
+    );
+
+    $datos['INTERESADO_CALLE'] = $this->valDesde(
+        [$intBase, $datos],
+        ['INTERESADO_CALLE', 'CALLE'],
+        ''
+    );
+
+    $datos['INTERESADO_NUMERO_EXTERIOR'] = $this->valDesde(
+        [$intBase, $datos],
+        ['INTERESADO_NUMERO_EXTERIOR', 'NUMERO_EXTERIOR', 'NUM_EXT'],
+        ''
+    );
+
+    $datos['INTERESADO_CP'] = $this->valDesde(
+        [$intBase, $datos],
+        ['INTERESADO_CP', 'CP', 'CODIGO_POSTAL'],
+        ''
+    );
+
+    /**
+     * Mercado.
+     */
+    $datos['MERCADO_NOMBRE'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_NOMBRE'],
+        ''
+    );
+
+    $datos['MERCADO_LOCAL'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_LOCAL'],
+        ''
+    );
+
+    $datos['MERCADO_GIRO'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_GIRO'],
+        ''
+    );
+
+    $datos['MERCADO_ALCALDIA'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_ALCALDIA'],
+        ''
+    );
+
+    $datos['MERCADO_COLONIA_NOMBRE'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_COLONIA_NOMBRE', 'MERCADO_COLONIA', 'MERCADO_COLONIA_MANUAL'],
+        ''
+    );
+
+    $datos['MERCADO_CALLE'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_CALLE'],
+        ''
+    );
+
+    $datos['MERCADO_NUM_EXT'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_NUM_EXT', 'MERCADO_NUMERO_EXTERIOR'],
+        ''
+    );
+
+    $datos['MERCADO_CP'] = $this->valDesde(
+        [$especificos, $datos],
+        ['MERCADO_CP'],
+        ''
+    );
+
+    /**
+     * Predio / ubicación del objeto.
+     */
+    $datos['PREDIO_ALCALDIA'] = $this->valDesde(
+        [$especificos, $datos],
+        ['PREDIO_ALCALDIA'],
+        ''
+    );
+
+    $datos['PREDIO_COLONIA_NOMBRE'] = $this->valDesde(
+        [$especificos, $datos],
+        ['PREDIO_COLONIA_NOMBRE', 'PREDIO_COLONIA', 'PREDIO_COLONIA_NOLISTA'],
+        ''
+    );
+
+    $datos['PREDIO_CALLE'] = $this->valDesde(
+        [$especificos, $datos],
+        ['PREDIO_CALLE'],
+        ''
+    );
+
+    $datos['PREDIO_NUMERO_EXTERIOR'] = $this->valDesde(
+        [$especificos, $datos],
+        ['PREDIO_NUMERO_EXTERIOR', 'PREDIO_NUM_EXT'],
+        ''
+    );
+
+    $datos['PREDIO_CODIGO_POSTAL'] = $this->valDesde(
+        [$especificos, $datos],
+        ['PREDIO_CODIGO_POSTAL', 'PREDIO_CP'],
+        ''
+    );
+
+    /**
+     * Representante legal plano.
+     */
+    $datos['LEG_NOMBRES'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_NOMBRES', 'LEGAL_NOMBRES'],
+        ''
+    );
+
+    $datos['LEG_PATERNO'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_PATERNO', 'LEGAL_PATERNO', 'LEGAL_APELLIDO_PATERNO'],
+        ''
+    );
+
+    $datos['LEG_MATERNO'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_MATERNO', 'LEGAL_MATERNO', 'LEGAL_APELLIDO_MATERNO'],
+        ''
+    );
+
+    $datos['LEG_RFC'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_RFC', 'LEGAL_RFC'],
+        ''
+    );
+
+    $datos['LEG_TELEFONO'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_TELEFONO', 'LEGAL_TELEFONO'],
+        ''
+    );
+
+    $datos['LEG_EMAIL'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_EMAIL', 'LEGAL_EMAIL'],
+        ''
+    );
+
+    $datos['LEG_DOC_PERSONALIDAD'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_DOC_PERSONALIDAD', 'LEGAL_DOC_PERSONALIDAD', 'LEGAL_DOCUMENTO_PERSONALIDAD'],
+        ''
+    );
+
+    $datos['LEG_DOM_DEL'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_DOM_DEL', 'LEG_ALCALDIA', 'LEGAL_ALCALDIA'],
+        ''
+    );
+
+    $datos['LEG_DOM_COLONIA'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_DOM_COLONIA', 'LEG_COLONIA', 'LEGAL_COLONIA'],
+        ''
+    );
+
+    $datos['LEG_DOM_CALLE'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_DOM_CALLE', 'LEGAL_CALLE', 'LEGAL_DOMICILIO_CALLE', 'LEG_DIRECCION_SIMPLE'],
+        ''
+    );
+
+    $datos['LEG_DOM_NUM_EXT'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_DOM_NUM_EXT', 'LEGAL_NUMERO_EXTERIOR', 'LEGAL_DOMICILIO_NUMERO_EXTERIOR'],
+        ''
+    );
+
+    $datos['LEG_DOM_CP'] = $this->valDesde(
+        [$representanteLegal, $datos],
+        ['LEG_DOM_CP', 'LEGAL_CP', 'LEGAL_CODIGO_POSTAL'],
+        ''
+    );
+
+    /**
+     * Persona autorizada plana.
+     */
+    $datos['AUT_NOMBRES'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_NOMBRES', 'AUTORIZADA_NOMBRES'],
+        ''
+    );
+
+    $datos['AUT_PATERNO'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_PATERNO', 'AUTORIZADA_PATERNO', 'AUTORIZADA_APELLIDO_PATERNO'],
+        ''
+    );
+
+    $datos['AUT_MATERNO'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_MATERNO', 'AUTORIZADA_MATERNO', 'AUTORIZADA_APELLIDO_MATERNO'],
+        ''
+    );
+
+    $datos['AUT_RFC'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_RFC', 'AUTORIZADA_RFC'],
+        ''
+    );
+
+    $datos['AUT_TELEFONO'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_TELEFONO', 'AUTORIZADA_TELEFONO'],
+        ''
+    );
+
+    $datos['AUT_EMAIL'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_EMAIL', 'AUTORIZADA_EMAIL'],
+        ''
+    );
+
+    $datos['AUT_DOC_PERSONALIDAD'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_DOC_PERSONALIDAD', 'AUTORIZADA_DOCUMENTO_PERSONALIDAD', 'AUTORIZADA_DOC_PERSONALIDAD'],
+        ''
+    );
+
+    $datos['AUT_DOM_DEL'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_DOM_DEL', 'AUTORIZADA_DOM_DEL', 'AUTORIZADA_ALCALDIA'],
+        ''
+    );
+
+    $datos['AUT_DOM_COLONIA'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_DOM_COLONIA', 'AUTORIZADA_DOM_COLONIA', 'AUTORIZADA_COLONIA'],
+        ''
+    );
+
+    $datos['AUT_DOM_CALLE'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_DOM_CALLE', 'AUTORIZADA_DOMICILIO_CALLE', 'AUT_DOM_CALLE_MANUAL', 'AUTORIZADA_DOMICILIO_CALLE_MANUAL'],
+        ''
+    );
+
+    $datos['AUT_DOM_NUM_EXT'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_DOM_NUM_EXT', 'AUTORIZADA_DOMICILIO_NUMERO_EXTERIOR'],
+        ''
+    );
+
+    $datos['AUT_DOM_CP'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_DOM_CP', 'AUTORIZADA_DOM_CP', 'AUTORIZADA_CODIGO_POSTAL'],
+        ''
+    );
+
+    $datos['AUT_DOMICILIO_PROCESAL'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_DOMICILIO_PROCESAL', 'AUTORIZADA_DOMICILIO_PROCESAL'],
+        ''
+    );
+
+    $datos['AUT_PERSONA_NOMBRE_EXTRA'] = $this->valDesde(
+        [$personaAutorizada, $datos],
+        ['AUT_PERSONA_NOMBRE_EXTRA', 'AUTORIZADA_PERSONA_NOMBRE_EXTRA'],
+        ''
+    );
+
+    /**
+     * Requisitos: genera REQ_1, REQ_2, etc.
+     */
+    if (is_array($requisitosValidados)) {
+        foreach ($requisitosValidados as $i => $req) {
+            $req = $this->limpiarValor($req, '');
+
+            if ($req !== '') {
+                $datos['REQ_' . ($i + 1)] = $req;
+            }
+        }
+    }
+
+    /**
+     * Recibos planos, por si el PDF viejo los necesita.
+     */
+    if (is_array($recibos)) {
+        foreach ($recibos as $key => $value) {
+            $upperKey = strtoupper((string)$key);
+            $datos[$upperKey] = $this->limpiarValor($value, '');
+        }
+    }
+
+    /**
+     * Específicos planos en mayúscula, para máxima compatibilidad.
+     */
+    if (is_array($especificos)) {
+        foreach ($especificos as $key => $value) {
+            $upperKey = strtoupper((string)$key);
+
+            if (!isset($datos[$upperKey])) {
+                $datos[$upperKey] = $this->limpiarValor($value, '');
+            }
+        }
+    }
+
+    return $datos;
+}
+
+
+/**
+ * Carga la vista principal de Ventanilla.
+ */
+public function index() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    try {
         $catalogoCompleto = $this->getCatalogoTramites();
-
-        // 2. Extraemos solo las llaves (Materias) para el primer Select
         $materias = array_keys($catalogoCompleto);
-        
-        // 3. Preparamos los datos iniciales
-        // Por defecto, cargamos los trámites de la primera materia para que no salga vacío
-        $primeraMateria = $materias[0];
-        $tramitesIniciales = array_keys($catalogoCompleto[$primeraMateria]);
-        
+
         $data = [
-            'pageTitle' => 'Gestión de Trámites - Ventanilla Única',
-            'user' => $_SESSION['user'] ?? null,
-            'materias' => $materias,
-            // Pasamos TODO el catálogo a la vista para que JS lo use
-            'catalogo_json' => $catalogoCompleto 
+            'pageTitle'     => 'Ventanilla Única de Trámites - Tlalpan',
+            'user'          => $_SESSION['user'] ?? null,
+            'materias'      => $materias,
+            'catalogo_json' => $catalogoCompleto
         ];
 
         $viewContent = '../app/Views/ventanilla/index.php';
         require_once '../app/Views/layouts/main.php';
+
+    } catch (\Throwable $e) {
+        error_log("ERROR EN VentanillaController::index(): " . $e->getMessage());
+        die("Error al cargar la interfaz de ventanilla: " . $e->getMessage());
     }
+}
+
+
+
+
+
+/**
+ * Abre el formulario actual en modo edición.
+ * No genera folio nuevo; precarga la solicitud existente.
+ */
+public function edit() {
+    return $this->editar();
+}
+
+public function editar() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    try {
+        $idSolicitud = (int)($_GET['id'] ?? $_GET['id_solicitud'] ?? 0);
+
+        if ($idSolicitud <= 0) {
+            throw new \Exception('ID de solicitud inválido para edición.');
+        }
+
+        $modelo = new \Ventanilla($this->db);
+
+        if (!method_exists($modelo, 'obtenerSolicitudParaEditar')) {
+            throw new \Exception('El modelo todavía no tiene el método obtenerSolicitudParaEditar().');
+        }
+
+        $solicitudEdit = $modelo->obtenerSolicitudParaEditar($idSolicitud);
+
+        if (!$solicitudEdit) {
+            throw new \Exception('No se encontró la solicitud que intentas editar.');
+        }
+
+        $catalogoCompleto = $this->getCatalogoTramites();
+        $materias = array_keys($catalogoCompleto);
+
+        $data = [
+            'pageTitle'      => 'Editar solicitud VUT - Tlalpan',
+            'user'           => $_SESSION['user'] ?? null,
+            'materias'       => $materias,
+            'catalogo_json'  => $catalogoCompleto,
+            'modo_edicion'   => true,
+            'id_solicitud'   => $idSolicitud,
+            'solicitud_edit' => $solicitudEdit
+        ];
+
+        $viewContent = '../app/Views/ventanilla/index.php';
+        require_once '../app/Views/layouts/main.php';
+
+    } catch (\Throwable $e) {
+        error_log('ERROR EN VentanillaController::editar(): ' . $e->getMessage());
+        die('Error al abrir la edición de la solicitud: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Guarda cambios de una solicitud existente.
+ */
+public function actualizar() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    try {
+        $raw = file_get_contents('php://input');
+        $payload = json_decode($raw, true);
+
+        if (!is_array($payload)) {
+            throw new \Exception('Payload inválido para actualización.');
+        }
+
+        $idSolicitud = (int)($payload['id_solicitud'] ?? $payload['id'] ?? $_GET['id'] ?? 0);
+
+        if ($idSolicitud <= 0) {
+            throw new \Exception('ID de solicitud inválido para actualización.');
+        }
+
+        unset($payload['id_solicitud'], $payload['id']);
+
+        $modelo = new \Ventanilla($this->db);
+
+        if (!method_exists($modelo, 'actualizarSolicitudCompleta')) {
+            throw new \Exception('El modelo todavía no tiene el método actualizarSolicitudCompleta().');
+        }
+
+        $resultado = $modelo->actualizarSolicitudCompleta($idSolicitud, $payload);
+
+        if (empty($resultado['success'])) {
+            http_response_code(400);
+        }
+
+        echo json_encode($resultado, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        error_log('ERROR EN VentanillaController::actualizar(): ' . $e->getMessage());
+
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+}
+
+
+/**
+ * Dashboard / bandeja principal de Ventanilla.
+ */
+public function dashboard() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    try {
+        $modelo = new \Ventanilla($this->db);
+
+        $data = [
+            'pageTitle' => 'Dashboard VUT - Bandeja de Trámites',
+            'user' => $_SESSION['user'] ?? null,
+            'estados' => method_exists($modelo, 'etiquetasEstadosProceso') ? $modelo->etiquetasEstadosProceso() : [],
+            'materias' => method_exists($modelo, 'obtenerMateriasDashboard') ? $modelo->obtenerMateriasDashboard() : [],
+            'tramites' => method_exists($modelo, 'obtenerTramitesDashboard') ? $modelo->obtenerTramitesDashboard() : [],
+            'puede_aprobar' => $this->puedeAprobarEstados()
+        ];
+
+        $viewContent = '../app/Views/ventanilla/dashboard.php';
+        require_once '../app/Views/layouts/main.php';
+
+    } catch (\Throwable $e) {
+        error_log('ERROR EN VentanillaController::dashboard(): ' . $e->getMessage());
+        die('Error al cargar dashboard de ventanilla: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Endpoint AJAX del dashboard.
+ */
+public function dashboardData() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    try {
+        $modelo = new \Ventanilla($this->db);
+
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $limit = (int)($_GET['limit'] ?? 25);
+        if ($limit <= 0 || $limit > 200) {
+            $limit = 25;
+        }
+
+        $filtros = [
+            'q' => trim((string)($_GET['q'] ?? '')),
+            'materia' => trim((string)($_GET['materia'] ?? '')),
+            'tramite' => trim((string)($_GET['tramite'] ?? '')),
+            'estado' => trim((string)($_GET['estado'] ?? '')),
+            'fecha_inicio' => trim((string)($_GET['fecha_inicio'] ?? '')),
+            'fecha_fin' => trim((string)($_GET['fecha_fin'] ?? '')),
+            'limit' => $limit,
+            'offset' => ($page - 1) * $limit
+        ];
+
+        $lista = $modelo->listarSolicitudesDashboard($filtros);
+        $resumen = $modelo->obtenerResumenDashboard($filtros);
+
+        echo json_encode([
+            'success' => true,
+            'summary' => $resumen,
+            'rows' => $lista['rows'] ?? [],
+            'total' => (int)($lista['total'] ?? 0),
+            'page' => $page,
+            'limit' => $limit,
+            'pages' => max(1, (int)ceil(((int)($lista['total'] ?? 0)) / $limit))
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        error_log('ERROR EN VentanillaController::dashboardData(): ' . $e->getMessage());
+
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+}
+
+/**
+ * Cambia el estado de una solicitud desde el dashboard.
+ */
+public function cambiarEstado() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    try {
+        $raw = file_get_contents('php://input');
+        $payload = json_decode($raw, true);
+
+        if (!is_array($payload)) {
+            $payload = $_POST;
+        }
+
+        $idSolicitud = (int)($payload['id_solicitud'] ?? $payload['id'] ?? 0);
+        $estadoNuevo = strtoupper(trim((string)($payload['estado'] ?? $payload['estado_nuevo'] ?? '')));
+        $observaciones = trim((string)($payload['observaciones'] ?? ''));
+
+        if ($idSolicitud <= 0) {
+            throw new \Exception('ID de solicitud inválido.');
+        }
+
+        if ($estadoNuevo === '') {
+            throw new \Exception('Selecciona un estado válido.');
+        }
+
+        $estadosFinales = ['APROBADO', 'RECHAZADO', 'TERMINADO', 'CANCELADO'];
+        if (in_array($estadoNuevo, $estadosFinales, true) && !$this->puedeAprobarEstados()) {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'error' => 'No tienes permisos para aprobar, rechazar, terminar o cancelar trámites.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return;
+        }
+
+        $usuarioId = isset($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null;
+        $usuarioNombre = $_SESSION['user']['nombre']
+            ?? $_SESSION['user']['name']
+            ?? $_SESSION['nombre']
+            ?? $_SESSION['usuario']
+            ?? 'SISTEMA';
+
+        $modelo = new \Ventanilla($this->db);
+        $resultado = $modelo->cambiarEstadoSolicitud(
+            $idSolicitud,
+            $estadoNuevo,
+            $observaciones,
+            $usuarioId,
+            $usuarioNombre
+        );
+
+        if (empty($resultado['success'])) {
+            http_response_code(400);
+        }
+
+        echo json_encode($resultado, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        error_log('ERROR EN VentanillaController::cambiarEstado(): ' . $e->getMessage());
+
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+}
+
+/**
+ * Detalle de una solicitud para modal del dashboard.
+ */
+public function detalle() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+
+    try {
+        $idSolicitud = (int)($_GET['id'] ?? $_GET['id_solicitud'] ?? 0);
+
+        if ($idSolicitud <= 0) {
+            throw new \Exception('ID de solicitud inválido.');
+        }
+
+        $modelo = new \Ventanilla($this->db);
+        $detalle = $modelo->obtenerDetalleDashboard($idSolicitud);
+
+        if (!$detalle) {
+            http_response_code(404);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Solicitud no encontrada.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'data' => $detalle
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        error_log('ERROR EN VentanillaController::detalle(): ' . $e->getMessage());
+
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+}
+
+/**
+ * Permisos básicos para estados finales.
+ */
+private function puedeAprobarEstados(): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $rol = $_SESSION['rol']
+        ?? ($_SESSION['user']['rol'] ?? '')
+        ?? ($_SESSION['user']['role'] ?? '');
+
+    return in_array(strtolower((string)$rol), ['root', 'admin', 'administrador'], true);
+}
+
 }
