@@ -80,6 +80,7 @@ class Ventanilla {
 
     /**
      * Revisa si existe una tabla.
+     * Versión robusta para servidor: usa INFORMATION_SCHEMA.
      */
     private function tableExists(string $table): bool {
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
@@ -91,20 +92,26 @@ class Ventanilla {
         }
 
         try {
-            $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+            ");
             $stmt->execute([$table]);
-            $exists = (bool)$stmt->fetchColumn();
+            $exists = ((int)$stmt->fetchColumn()) > 0;
         } catch (\Throwable $e) {
+            error_log("VUT ERROR tableExists({$table}): " . $e->getMessage());
             $exists = false;
         }
 
         $this->tableCache[$table] = $exists;
-
         return $exists;
     }
 
     /**
      * Revisa si existe una columna.
+     * Versión robusta para servidor: usa INFORMATION_SCHEMA.
      */
     private function columnExists(string $table, string $column): bool {
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
@@ -123,25 +130,39 @@ class Ventanilla {
         }
 
         try {
-            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
-            $stmt->execute([$column]);
-            $exists = (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND COLUMN_NAME = ?
+            ");
+            $stmt->execute([$table, $column]);
+            $exists = ((int)$stmt->fetchColumn()) > 0;
         } catch (\Throwable $e) {
+            error_log("VUT ERROR columnExists({$table}.{$column}): " . $e->getMessage());
             $exists = false;
         }
 
         $this->columnCache[$key] = $exists;
-
         return $exists;
     }
 
     /**
      * Inserta un registro filtrando columnas inexistentes.
-     * Esto permite que el modelo funcione aunque algún ALTER no se haya aplicado todavía.
+     * Ahora lanza errores reales para no ocultar fallas de BD.
      */
     private function insertarRegistro(string $table, array $data) {
         if (!$this->tableExists($table)) {
-            return false;
+            $dbActual = 'DESCONOCIDA';
+
+            try {
+                $dbActual = (string)$this->db->query("SELECT DATABASE()")->fetchColumn();
+            } catch (\Throwable $e) {
+                $dbActual = 'NO SE PUDO LEER DATABASE()';
+            }
+
+            throw new \Exception("La tabla '{$table}' no existe o no es visible en la base '{$dbActual}'.");
         }
 
         $filtered = [];
@@ -149,21 +170,50 @@ class Ventanilla {
         foreach ($data as $column => $value) {
             if ($this->columnExists($table, $column)) {
                 $filtered[$column] = $value;
+            } else {
+                error_log("VUT WARN columna omitida: {$table}.{$column}");
             }
         }
 
         if (empty($filtered)) {
-            return false;
+            $columnasReales = [];
+
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = ?
+                    ORDER BY ORDINAL_POSITION
+                ");
+                $stmt->execute([$table]);
+                $columnasReales = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            } catch (\Throwable $e) {
+                error_log("VUT ERROR leyendo columnas reales: " . $e->getMessage());
+            }
+
+            error_log("VUT DATA INTENTADA {$table}: " . print_r($data, true));
+            error_log("VUT COLUMNAS REALES {$table}: " . print_r($columnasReales, true));
+
+            throw new \Exception("No hay columnas válidas para insertar en '{$table}'. Revisa estructura de tabla.");
         }
 
         $columns = array_keys($filtered);
         $placeholders = array_fill(0, count($columns), '?');
 
         $sql = "INSERT INTO `{$table}` (`" . implode('`, `', $columns) . "`) VALUES (" . implode(', ', $placeholders) . ")";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(array_values($filtered));
 
-        return $this->db->lastInsertId();
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute(array_values($filtered));
+            return $this->db->lastInsertId();
+        } catch (\Throwable $e) {
+            error_log("VUT ERROR INSERT {$table}: " . $e->getMessage());
+            error_log("VUT SQL: " . $sql);
+            error_log("VUT DATA FILTRADA: " . print_r($filtered, true));
+
+            throw new \Exception("Error insertando en '{$table}': " . $e->getMessage());
+        }
     }
 
     /**
@@ -293,31 +343,139 @@ class Ventanilla {
 
             /**
              * 1. SOLICITUD PRINCIPAL
-             * Ahora persistimos también la bifurcación en columnas consultables.
+             * Insert directo para evitar fallos silenciosos con insertarRegistro().
              */
-            $solicitudData = [
-                'folio'               => $folio,
-                'materia'             => $this->limpiar($sol['materia'] ?? null),
-                'nombre_tramite'      => $this->limpiar($sol['tramite'] ?? null),
-                'tipo_persona'        => $this->normalizarCatalogo($sol['tipo_persona'] ?? null),
-                'tipo_representante'  => $this->normalizarCatalogo($sol['tipo_representante'] ?? null),
-                'payload'             => $payloadJson,
-                'bifurcacion_clave'   => $this->limpiar($this->val($bif, ['clave', 'CLAVE'])),
-                'modalidad'           => $this->limpiar($this->val($bif, ['modalidad', 'MODALIDAD'])),
-                'modalidad_texto'     => $this->limpiar($this->val($bif, ['modalidad_texto', 'MODALIDAD_TEXTO'])),
-                'detalle'             => $this->limpiar($this->val($bif, ['detalle', 'DETALLE'])),
-                'detalle_texto'       => $this->limpiar($this->val($bif, ['detalle_texto', 'DETALLE_TEXTO'])),
-                'estatus'             => 'finalizado',
-                'estado_proceso'      => 'INGRESADO',
-                'etapa_actual'        => 'RECEPCION_VUT',
-                'prioridad'           => 'NORMAL',
-                'fecha_estado'        => date('Y-m-d H:i:s')
+            $materia = $this->limpiar($sol['materia'] ?? null);
+            $nombreTramite = $this->limpiar($sol['tramite'] ?? null);
+            $tipoPersona = $this->normalizarCatalogo($sol['tipo_persona'] ?? null);
+            $tipoRepresentante = $this->normalizarCatalogo($sol['tipo_representante'] ?? null);
+
+            // Normalización extra por si el front manda textos largos.
+            $mapTipoPersona = [
+                'persona_fisica' => 'fisica',
+                'fisico' => 'fisica',
+                'fisica' => 'fisica',
+                'persona_moral' => 'moral',
+                'moral' => 'moral'
             ];
 
-            $id_solicitud = $this->insertarRegistro('solicitudes', $solicitudData);
+            $mapTipoRepresentante = [
+                'propietario' => 'propietario',
+                'interesado' => 'propietario',
+                'sin_representante' => 'propietario',
+                'ninguno' => 'propietario',
+                'legal' => 'legal',
+                'representante_legal' => 'legal',
+                'autorizada' => 'autorizada',
+                'autorizado' => 'autorizada',
+                'persona_autorizada' => 'autorizada',
+                'representante' => 'representante'
+            ];
 
-            if (!$id_solicitud) {
-                throw new \Exception("No se pudo registrar la solicitud principal.");
+            $tipoPersona = $mapTipoPersona[$tipoPersona] ?? $tipoPersona;
+            $tipoRepresentante = $mapTipoRepresentante[$tipoRepresentante] ?? $tipoRepresentante;
+
+            $bifurcacionClave = $this->limpiar($this->val($bif, ['clave', 'CLAVE']));
+            $modalidad = $this->limpiar($this->val($bif, ['modalidad', 'MODALIDAD']));
+            $modalidadTexto = $this->limpiar($this->val($bif, ['modalidad_texto', 'MODALIDAD_TEXTO']));
+            $detalle = $this->limpiar($this->val($bif, ['detalle', 'DETALLE']));
+            $detalleTexto = $this->limpiar($this->val($bif, ['detalle_texto', 'DETALLE_TEXTO']));
+
+            if ($materia === null) {
+                throw new \Exception("No se recibió la materia de la solicitud.");
+            }
+
+            if ($nombreTramite === null) {
+                throw new \Exception("No se recibió el nombre del trámite.");
+            }
+
+            if ($tipoPersona === null) {
+                throw new \Exception("No se recibió el tipo de persona.");
+            }
+
+            if ($tipoRepresentante === null) {
+                $tipoRepresentante = 'propietario';
+            }
+
+            if (!in_array($tipoPersona, ['fisica', 'moral'], true)) {
+                throw new \Exception("Tipo de persona inválido: " . $tipoPersona);
+            }
+
+            if (!in_array($tipoRepresentante, ['propietario', 'legal', 'autorizada', 'representante'], true)) {
+                throw new \Exception("Tipo de representante inválido: " . $tipoRepresentante);
+            }
+
+            try {
+                $sqlSolicitud = "
+                    INSERT INTO solicitudes (
+                        folio,
+                        materia,
+                        nombre_tramite,
+                        tipo_persona,
+                        tipo_representante,
+                        payload,
+                        bifurcacion_clave,
+                        modalidad,
+                        modalidad_texto,
+                        detalle,
+                        detalle_texto,
+                        estatus,
+                        estado_proceso,
+                        etapa_actual,
+                        prioridad,
+                        fecha_estado
+                    ) VALUES (
+                        :folio,
+                        :materia,
+                        :nombre_tramite,
+                        :tipo_persona,
+                        :tipo_representante,
+                        :payload,
+                        :bifurcacion_clave,
+                        :modalidad,
+                        :modalidad_texto,
+                        :detalle,
+                        :detalle_texto,
+                        :estatus,
+                        :estado_proceso,
+                        :etapa_actual,
+                        :prioridad,
+                        NOW()
+                    )
+                ";
+
+                $stmtSolicitud = $this->db->prepare($sqlSolicitud);
+
+                $stmtSolicitud->execute([
+                    ':folio' => $folio,
+                    ':materia' => $materia,
+                    ':nombre_tramite' => $nombreTramite,
+                    ':tipo_persona' => $tipoPersona,
+                    ':tipo_representante' => $tipoRepresentante,
+                    ':payload' => $payloadJson,
+                    ':bifurcacion_clave' => $bifurcacionClave,
+                    ':modalidad' => $modalidad,
+                    ':modalidad_texto' => $modalidadTexto,
+                    ':detalle' => $detalle,
+                    ':detalle_texto' => $detalleTexto,
+                    ':estatus' => 'finalizado',
+                    ':estado_proceso' => 'INGRESADO',
+                    ':etapa_actual' => 'RECEPCION_VUT',
+                    ':prioridad' => 'NORMAL'
+                ]);
+
+                $id_solicitud = (int)$this->db->lastInsertId();
+
+                if ($id_solicitud <= 0) {
+                    throw new \Exception("El INSERT se ejecutó, pero no regresó id_solicitud.");
+                }
+
+            } catch (\Throwable $e) {
+                error_log("VUT ERROR INSERT solicitudes: " . $e->getMessage());
+                error_log("VUT PAYLOAD solicitud: " . print_r($sol, true));
+                error_log("VUT PAYLOAD bifurcacion: " . print_r($bif, true));
+
+                throw new \Exception("Error al registrar solicitud principal: " . $e->getMessage());
             }
 
             /**
@@ -1431,7 +1589,7 @@ class Ventanilla {
 
             if ($this->columnExists('solicitudes', 'estatus')) {
                 $sets[] = 'estatus = ?';
-                $params[] = in_array($estadoNuevo, ['APROBADO', 'RECHAZADO', 'TERMINADO', 'CANCELADO'], true) ? strtolower($estadoNuevo) : 'finalizado';
+                $params[] = ($estadoNuevo === 'CANCELADO') ? 'cancelado' : 'finalizado';
             }
 
             if (!empty($sets)) {
