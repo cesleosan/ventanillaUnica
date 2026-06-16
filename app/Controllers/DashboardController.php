@@ -2,7 +2,6 @@
 // app/Controllers/DashboardController.php
 
 class DashboardController {
-
     private $db = null;
 
     public function __construct() {
@@ -15,7 +14,6 @@ class DashboardController {
 
     private function generateCaptchaBase64() {
         $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
         $code = '';
         $length = strlen($chars);
 
@@ -25,9 +23,7 @@ class DashboardController {
 
         $_SESSION['captcha_code'] = $code;
 
-        if (!function_exists('imagecreatetruecolor')) {
-            return null;
-        }
+        if (!function_exists('imagecreatetruecolor')) return null;
 
         $image = imagecreatetruecolor(130, 45);
         $bg_color = imagecolorallocate($image, 250, 250, 250);
@@ -50,16 +46,15 @@ class DashboardController {
         return 'data:image/jpeg;base64,' . base64_encode($imageData);
     }
 
-    private function buscarUsuarioActivo(string $usuario): ?array {
-        $stmt = $this->db->prepare("SELECT id, usuario, password, nombre_completo, telefono, rol, activo, ultimo_acceso, created_at
+    private function buscarUsuarioVUT(string $usuario): ?array {
+        $stmt = $this->db->prepare("SELECT id, usuario, password, nombre_completo, telefono, rol, modulo, activo, ultimo_acceso, created_at
                                     FROM usuarios
                                     WHERE usuario = ?
-                                    AND activo = 1
-                                    AND modulo = 'VUT'
+                                      AND activo = 1
+                                      AND modulo = 'VUT'
                                     LIMIT 1");
         $stmt->execute([$usuario]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
         return $row ?: null;
     }
 
@@ -80,14 +75,15 @@ class DashboardController {
             'name' => $usuario['nombre_completo'],
             'rol' => $usuario['rol'],
             'role' => $usuario['rol'],
+            'modulo' => $usuario['modulo'] ?? 'VUT',
             'telefono' => $usuario['telefono'] ?? null
         ];
 
-        // Compatibilidad con código viejo que lee variables directas de sesión.
         $_SESSION['id_usuario'] = (int)$usuario['id'];
         $_SESSION['usuario'] = $usuario['usuario'];
         $_SESSION['nombre'] = $usuario['nombre_completo'];
         $_SESSION['rol'] = $usuario['rol'];
+        $_SESSION['modulo'] = $usuario['modulo'] ?? 'VUT';
     }
 
     public function index() {
@@ -113,22 +109,18 @@ class DashboardController {
                     if ($username === '' || $password === '') {
                         $error = 'Usuario y contraseña son obligatorios.';
                     } else {
-                        $usuario = $this->buscarUsuarioActivo($username);
+                        $usuario = $this->buscarUsuarioVUT($username);
 
-                        if (!$usuario || (int)$usuario['activo'] !== 1) {
-                            $error = 'Usuario o contraseña incorrectos.';
-                        } elseif (!password_verify($password, (string)$usuario['password'])) {
-                            $error = 'Usuario o contraseña incorrectos.';
+                        if (!$usuario || !password_verify($password, (string)$usuario['password'])) {
+                            $error = 'Usuario o contraseña incorrectos para VUT.';
                         } else {
                             $this->iniciarSesionUsuario($usuario);
                             $this->registrarAcceso((int)$usuario['id']);
-
                             header('Location: /');
                             exit;
                         }
                     }
                 }
-
             } elseif ($action === 'logout') {
                 session_destroy();
                 header('Location: /');
@@ -137,8 +129,8 @@ class DashboardController {
         }
 
         $isLoggedIn = isset($_SESSION['user']);
-
         $captchaImage = '';
+
         if (!$isLoggedIn) {
             $captchaImage = $this->generateCaptchaBase64();
         }

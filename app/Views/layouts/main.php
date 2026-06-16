@@ -4,26 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $data['pageTitle'] ?? 'Ventanilla Única - Alcaldía Tlalpan' ?></title>
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-    
+
     <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
+        body {
+            font-family: 'Inter', sans-serif;
             background-color: #F9FAFB;
         }
-        /* Identidad Institucional */
         .bg-tlalpan-vino { background-color: #773357; }
         .text-tlalpan-vino { color: #773357; }
         .bg-tlalpan-oro { background-color: #988053; }
-        
-        /* Estilos de Formulario Uniformes */
+        .border-tlalpan-vino { border-color: #773357; }
         .input-tlalpan {
             background-color: #FCF7F9;
             border: 1px solid #E6D4DD;
             transition: all 0.3s ease;
-            border-radius: 0.75rem; /* rounded-xl */
+            border-radius: 0.75rem;
         }
         .input-tlalpan:focus {
             background-color: #ffffff;
@@ -31,8 +29,6 @@
             box-shadow: 0 0 0 4px rgba(119, 51, 87, 0.1);
             outline: none;
         }
-
-        /* Animación para contenido */
         .view-fade-in {
             animation: fadeIn 0.4s ease-out forwards;
         }
@@ -43,31 +39,51 @@
     </style>
 </head>
 
+<?php
+$userLayout = $data['user'] ?? ($_SESSION['user'] ?? null);
+$nombreUsuarioLayout = $userLayout['nombre'] ?? $userLayout['name'] ?? 'USUARIO';
+$rolUsuarioLayout = strtolower((string)($userLayout['rol'] ?? $userLayout['role'] ?? $_SESSION['rol'] ?? ''));
+$moduloUsuarioLayout = strtoupper((string)($userLayout['modulo'] ?? $_SESSION['modulo'] ?? ''));
+$puedeUsuariosLayout = isset($userLayout) && in_array($rolUsuarioLayout, ['root', 'supervisor'], true) && $moduloUsuarioLayout === 'VUT';
+?>
+
 <body class="flex flex-col min-h-screen">
 
     <header class="bg-white border-b border-gray-100 shadow-sm relative z-20">
-        <div class="max-w-7xl mx-auto px-4 h-24 flex justify-between items-center">
-            
+        <div class="max-w-7xl mx-auto px-4 min-h-24 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+
             <div class="flex items-center gap-6">
                 <img src="/logos/Logo AT Vertical guinda 100 PX.png" alt="Logo Tlalpan" class="h-16 w-auto object-contain">
-                
+
                 <div class="hidden sm:block h-10 w-px bg-gray-200"></div>
-                
+
                 <div class="flex flex-col">
                     <h2 class="text-xl font-black text-tlalpan-vino tracking-tight leading-none uppercase">Ciudad De México</h2>
-                    <p class="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-1">Alcaldía Tlalpan</p>
+                    <p class="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-1">Alcaldía Tlalpan · Ventanilla Única</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-4">
-                <?php if (isset($data['user'])): ?>
+            <div class="flex flex-col md:flex-row md:items-center gap-3">
+                <?php if (isset($userLayout)): ?>
+                    <nav class="flex flex-wrap items-center gap-2 justify-start md:justify-end">
+                        <a href="/" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 hover:bg-[#FCF7F9] hover:text-[#773357] transition-all">Inicio</a>
+                        <a href="index.php?route=ventanilla" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 hover:bg-[#FCF7F9] hover:text-[#773357] transition-all">Dashboard VUT</a>
+                        <a href="index.php?route=ventanilla/nueva" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#773357] text-white hover:bg-[#5b2743] transition-all">Nueva captura</a>
+
+                        <?php if ($puedeUsuariosLayout): ?>
+                            <a href="index.php?route=usuarios" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#FCF7F9] text-[#773357] border border-[#E6D4DD] hover:bg-[#773357] hover:text-white transition-all">👥 Usuarios</a>
+                        <?php endif; ?>
+                    </nav>
+
                     <div class="flex items-center gap-3 bg-gray-50 p-2 pr-4 rounded-2xl border border-gray-100">
                         <div class="w-10 h-10 bg-tlalpan-vino rounded-xl flex items-center justify-center text-white font-bold shadow-sm">
-                            <?= substr($data['user']['name'], 0, 1) ?>
+                            <?= htmlspecialchars(substr($nombreUsuarioLayout, 0, 1), ENT_QUOTES, 'UTF-8') ?>
                         </div>
                         <div class="hidden md:flex flex-col">
-                            <span class="text-xs font-black text-gray-700 leading-none uppercase"><?= $data['user']['name'] ?></span>
-                            <span class="text-[10px] text-tlalpan-vino font-bold uppercase mt-1 tracking-wider"><?= $data['user']['role'] ?></span>
+                            <span class="text-xs font-black text-gray-700 leading-none uppercase"><?= htmlspecialchars($nombreUsuarioLayout, ENT_QUOTES, 'UTF-8') ?></span>
+                            <span class="text-[10px] text-tlalpan-vino font-bold uppercase mt-1 tracking-wider">
+                                <?= htmlspecialchars($rolUsuarioLayout, ENT_QUOTES, 'UTF-8') ?><?= $moduloUsuarioLayout ? ' · ' . htmlspecialchars($moduloUsuarioLayout, ENT_QUOTES, 'UTF-8') : '' ?>
+                            </span>
                         </div>
                         <form method="POST" action="/" class="ml-2">
                             <input type="hidden" name="action" value="logout">
@@ -94,19 +110,19 @@
         </div>
 
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10 view-fade-in">
-            <?php 
+            <?php
                 if (isset($viewContent) && file_exists($viewContent)) {
                     include $viewContent;
                 }
-                elseif (isset($data['user'])) {
-                    if(file_exists('../app/Views/dashboard/home.php')){
-                         include '../app/Views/dashboard/home.php'; 
+                elseif (isset($userLayout)) {
+                    if (file_exists('../app/Views/dashboard/home.php')) {
+                        include '../app/Views/dashboard/home.php';
                     } else {
                         echo "<div class='bg-white p-8 rounded-3xl shadow-xl text-center border-2 border-dashed border-red-100'>
                                 <p class='text-red-500 font-bold'>Error: El dashboard no está disponible.</p>
                               </div>";
                     }
-                } 
+                }
                 else {
                     include '../app/Views/auth/login.php';
                 }
@@ -123,7 +139,7 @@
                     <p class="text-[9px] text-gray-300 uppercase tracking-[0.3em]">Ventanilla Única</p>
                 </div>
             </div>
-            
+
             <div class="text-center md:text-right">
                 <p class="text-xs font-bold text-gray-400">© <?= date('Y') ?> - Todos los derechos reservados</p>
                 <p class="text-[10px] text-tlalpan-vino font-black uppercase tracking-widest mt-1">Gobierno de la Ciudad de México</p>

@@ -19,11 +19,18 @@ class UsuariosController {
 
         $rol = strtolower((string)(
             $_SESSION['user']['rol']
+            ?? $_SESSION['user']['role']
             ?? $_SESSION['rol']
             ?? ''
         ));
 
-        return in_array($rol, ['root', 'supervisor'], true);
+        $modulo = strtoupper((string)(
+            $_SESSION['user']['modulo']
+            ?? $_SESSION['modulo']
+            ?? ''
+        ));
+
+        return in_array($rol, ['root', 'supervisor'], true) && $modulo === 'VUT';
     }
 
     private function json(array $data, int $status = 200): void {
@@ -39,18 +46,19 @@ class UsuariosController {
 
         if (!$this->puedeAdministrar()) {
             http_response_code(403);
-            die('No tienes permisos para administrar usuarios.');
+            die('No tienes permisos para administrar usuarios VUT. Inicia sesión con un usuario VUT root o supervisor.');
         }
 
         $modelo = new \Usuario($this->db);
         $q = trim((string)($_GET['q'] ?? ''));
 
         $data = [
-            'pageTitle' => 'Administración de Usuarios',
+            'pageTitle' => 'Administración de Usuarios VUT',
             'user' => $_SESSION['user'] ?? null,
             'usuarios' => $modelo->listar($q),
             'roles' => $modelo->rolesPermitidos(),
-            'q' => $q
+            'q' => $q,
+            'modulo' => 'VUT'
         ];
 
         $viewContent = '../app/Views/usuarios/index.php';
@@ -63,7 +71,7 @@ class UsuariosController {
         }
 
         if (!$this->puedeAdministrar()) {
-            $this->json(['success' => false, 'error' => 'No tienes permisos para administrar usuarios.'], 403);
+            $this->json(['success' => false, 'error' => 'No tienes permisos para administrar usuarios VUT.'], 403);
             return;
         }
 
@@ -84,7 +92,7 @@ class UsuariosController {
         }
 
         if (!$this->puedeAdministrar()) {
-            $this->json(['success' => false, 'error' => 'No tienes permisos para administrar usuarios.'], 403);
+            $this->json(['success' => false, 'error' => 'No tienes permisos para administrar usuarios VUT.'], 403);
             return;
         }
 
