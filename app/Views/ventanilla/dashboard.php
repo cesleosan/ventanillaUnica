@@ -1436,14 +1436,106 @@ $puedeAprobar = !empty($data['puede_aprobar']);
 
         const options = estados.map(([key, label]) => `
             <option value="${vutDashEsc(key)}" ${key === estadoActual ? 'selected' : ''}>
-                ${vutDashEsc(label)}
+                ${vutDashEsc(key === 'APROBADO' ? 'Autorizado' : label)}
             </option>
         `).join('');
+
+        const estadoRequiereFirmaRecibido = (estado) => ['APROBADO', 'AUTORIZADO'].includes(String(estado || '').toUpperCase());
+        let firmaCanvas = null;
+        let firmaCtx = null;
+        let firmaDibujando = false;
+        let firmaTieneTrazo = false;
+
+        const prepararCanvasFirmaRecibido = () => {
+            firmaCanvas = document.getElementById('swal-firma-recibido-canvas');
+            if (!firmaCanvas) return;
+
+            const rect = firmaCanvas.getBoundingClientRect();
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+
+            firmaCanvas.width = Math.floor(rect.width * ratio);
+            firmaCanvas.height = Math.floor(rect.height * ratio);
+
+            firmaCtx = firmaCanvas.getContext('2d');
+            firmaCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            firmaCtx.lineWidth = 2.2;
+            firmaCtx.lineCap = 'round';
+            firmaCtx.lineJoin = 'round';
+            firmaCtx.strokeStyle = '#111827';
+            firmaCtx.fillStyle = '#ffffff';
+            firmaCtx.fillRect(0, 0, rect.width, rect.height);
+
+            const getPos = (evt) => {
+                const r = firmaCanvas.getBoundingClientRect();
+                const p = evt.touches && evt.touches.length ? evt.touches[0] : evt;
+                return {
+                    x: p.clientX - r.left,
+                    y: p.clientY - r.top
+                };
+            };
+
+            const iniciar = (evt) => {
+                evt.preventDefault();
+                firmaDibujando = true;
+                const pos = getPos(evt);
+                firmaCtx.beginPath();
+                firmaCtx.moveTo(pos.x, pos.y);
+            };
+
+            const dibujar = (evt) => {
+                if (!firmaDibujando) return;
+                evt.preventDefault();
+                const pos = getPos(evt);
+                firmaCtx.lineTo(pos.x, pos.y);
+                firmaCtx.stroke();
+                firmaTieneTrazo = true;
+            };
+
+            const terminar = (evt) => {
+                if (evt) evt.preventDefault();
+                firmaDibujando = false;
+            };
+
+            firmaCanvas.addEventListener('mousedown', iniciar);
+            firmaCanvas.addEventListener('mousemove', dibujar);
+            firmaCanvas.addEventListener('mouseup', terminar);
+            firmaCanvas.addEventListener('mouseleave', terminar);
+            firmaCanvas.addEventListener('touchstart', iniciar, { passive: false });
+            firmaCanvas.addEventListener('touchmove', dibujar, { passive: false });
+            firmaCanvas.addEventListener('touchend', terminar, { passive: false });
+
+            const limpiarBtn = document.getElementById('swal-limpiar-firma-recibido');
+            if (limpiarBtn) {
+                limpiarBtn.addEventListener('click', () => {
+                    const r = firmaCanvas.getBoundingClientRect();
+                    firmaCtx.fillStyle = '#ffffff';
+                    firmaCtx.fillRect(0, 0, r.width, r.height);
+                    firmaTieneTrazo = false;
+                });
+            }
+        };
+
+        const actualizarBloqueFirmaRecibido = () => {
+            const estado = document.getElementById('swal-estado')?.value || '';
+            const bloque = document.getElementById('bloque-firma-recibido');
+            const ayuda = document.getElementById('swal-firma-recibido-ayuda');
+
+            if (!bloque) return;
+
+            const mostrar = estadoRequiereFirmaRecibido(estado);
+            bloque.style.display = mostrar ? 'block' : 'none';
+
+            if (ayuda) {
+                ayuda.textContent = mostrar
+                    ? 'Para autorizar el trámite es obligatorio capturar la firma de recibido. Esta firma se anexará al acuse.'
+                    : '';
+            }
+        };
 
         const res = await Swal.fire(vutSwalConfig({
             icon: 'question',
             title: 'Cambiar estado',
-            width: 660,
+            width: 780,
             html: `
                 <div style="text-align:left;">
                     <p style="font-size:13px;color:#6b7280;font-weight:700;margin-bottom:14px;">
@@ -1463,14 +1555,69 @@ $puedeAprobar = !empty($data['puede_aprobar']);
                     <textarea
                         id="swal-observaciones"
                         class="swal2-textarea"
-                        style="width:100%;margin:8px 0 0 0;"
+                        style="width:100%;margin:8px 0 14px 0;"
                         placeholder="Motivo, nota o comentario para historial"
                     ></textarea>
+
+                    <div id="bloque-firma-recibido" style="display:none;margin-top:10px;padding:14px;border:1px solid #ead9e2;border-radius:16px;background:#fcf7f9;">
+                        <div style="font-size:12px;font-weight:900;color:#773357;text-transform:uppercase;margin-bottom:8px;">
+                            Firma de recibido para autorización
+                        </div>
+                        <p id="swal-firma-recibido-ayuda" style="margin:0 0 12px 0;font-size:12px;color:#6b7280;font-weight:700;line-height:1.45;"></p>
+
+                        <label style="font-size:11px;font-weight:900;color:#773357;text-transform:uppercase;">
+                            Nombre de quien recibe
+                        </label>
+                        <input
+                            id="swal-firma-recibido-nombre"
+                            class="swal2-input"
+                            style="width:100%;margin:8px 0 12px 0;"
+                            placeholder="Nombre completo"
+                        >
+
+                        <label style="font-size:11px;font-weight:900;color:#773357;text-transform:uppercase;">
+                            Firma de recibido
+                        </label>
+                        <div style="background:#fff;border:1px dashed #c9a9bb;border-radius:14px;padding:8px;margin-top:8px;">
+                            <canvas
+                                id="swal-firma-recibido-canvas"
+                                style="display:block;width:100%;height:170px;touch-action:none;border-radius:10px;background:#fff;"
+                            ></canvas>
+                        </div>
+
+                        <button
+                            type="button"
+                            id="swal-limpiar-firma-recibido"
+                            class="swal2-styled"
+                            style="margin:10px 0 0 0;background:#6b7280;font-size:11px;padding:8px 14px;"
+                        >
+                            Limpiar firma
+                        </button>
+
+                        <label style="display:block;margin-top:12px;font-size:11px;font-weight:900;color:#773357;text-transform:uppercase;">
+                            Observaciones de recibido opcionales
+                        </label>
+                        <textarea
+                            id="swal-firma-recibido-observaciones"
+                            class="swal2-textarea"
+                            style="width:100%;margin:8px 0 0 0;min-height:72px;"
+                            placeholder="Ej. Recibe resolución/autorización del trámite"
+                        ></textarea>
+                    </div>
                 </div>
             `,
             showCancelButton: true,
             confirmButtonText: 'Guardar estado',
             cancelButtonText: 'Cancelar',
+            didOpen: () => {
+                prepararCanvasFirmaRecibido();
+                actualizarBloqueFirmaRecibido();
+
+                const estadoSelect = document.getElementById('swal-estado');
+                if (estadoSelect) {
+                    estadoSelect.addEventListener('change', actualizarBloqueFirmaRecibido);
+                }
+            },
             preConfirm: () => {
                 const estado = document.getElementById('swal-estado').value;
                 const observaciones = document.getElementById('swal-observaciones').value.trim();
@@ -1480,7 +1627,31 @@ $puedeAprobar = !empty($data['puede_aprobar']);
                     return false;
                 }
 
-                return { estado, observaciones };
+                let firmaRecibido = null;
+
+                if (estadoRequiereFirmaRecibido(estado)) {
+                    const nombre = document.getElementById('swal-firma-recibido-nombre').value.trim();
+                    const observacionesFirma = document.getElementById('swal-firma-recibido-observaciones').value.trim();
+
+                    if (nombre.length < 3) {
+                        Swal.showValidationMessage('Captura el nombre de quien recibe.');
+                        return false;
+                    }
+
+                    if (!firmaCanvas || !firmaTieneTrazo) {
+                        Swal.showValidationMessage('Captura la firma de recibido para autorizar el trámite.');
+                        return false;
+                    }
+
+                    firmaRecibido = {
+                        imagen: firmaCanvas.toDataURL('image/png'),
+                        nombre: nombre,
+                        fecha: new Date().toISOString(),
+                        observaciones: observacionesFirma
+                    };
+                }
+
+                return { estado, observaciones, firma_recibido: firmaRecibido };
             }
         }));
 
@@ -1503,7 +1674,8 @@ $puedeAprobar = !empty($data['puede_aprobar']);
                 body: JSON.stringify({
                     id_solicitud: id,
                     estado: res.value.estado,
-                    observaciones: res.value.observaciones
+                    observaciones: res.value.observaciones,
+                    firma_recibido: res.value.firma_recibido || null
                 })
             });
 
@@ -1516,7 +1688,9 @@ $puedeAprobar = !empty($data['puede_aprobar']);
             await Swal.fire(vutSwalConfig({
                 icon: 'success',
                 title: 'Estado actualizado',
-                text: 'El trámite fue actualizado correctamente.',
+                text: res.value.firma_recibido
+                    ? 'El trámite fue autorizado y la firma de recibido fue anexada al acuse.'
+                    : 'El trámite fue actualizado correctamente.',
                 confirmButtonText: 'Entendido'
             }));
 

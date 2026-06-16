@@ -1434,6 +1434,44 @@ $tablaEspecificos = vut_pdf_dynamic_table($especificos, $excludeEspecificos);
 
 <?= vut_pdf_section_title('FIRMAS DIGITALES') ?>
 
+<?php
+/**
+ * FIRMA ADICIONAL DE RECIBIDO / AUTORIZADO
+ * Solo se muestra cuando la solicitud ya está autorizada/aprobada/terminada.
+ */
+
+$estadoProcesoFirma = strtoupper(trim((string)($datos['ESTADO_PROCESO'] ?? $datos['estado_proceso'] ?? '')));
+
+$firmaRecibidoImg = trim((string)(
+    $datos['FIRMA_RECIBIDO']
+    ?? $datos['firma_recibido']
+    ?? ''
+));
+
+$firmaRecibidoNombre = trim((string)(
+    $datos['FIRMA_RECIBIDO_NOMBRE']
+    ?? $datos['firma_recibido_nombre']
+    ?? ''
+));
+
+$firmaRecibidoFecha = trim((string)(
+    $datos['FIRMA_RECIBIDO_FECHA']
+    ?? $datos['firma_recibido_fecha']
+    ?? ''
+));
+
+$firmaRecibidoObservaciones = trim((string)(
+    $datos['FIRMA_RECIBIDO_OBSERVACIONES']
+    ?? $datos['firma_recibido_observaciones']
+    ?? ''
+));
+
+$mostrarFirmaRecibido = (
+    in_array($estadoProcesoFirma, ['AUTORIZADO', 'APROBADO', 'TERMINADO'], true)
+    && $firmaRecibidoImg !== ''
+);
+?>
+
 <table class="firma-table">
     <tr>
         <td>
@@ -1449,17 +1487,53 @@ $tablaEspecificos = vut_pdf_dynamic_table($especificos, $excludeEspecificos);
             <?php else: ?>
                 _______________________________________<br>
             <?php endif; ?>
+
             FIRMA DEL INTERESADO
         </td>
+
         <td>
             <?php if ($firmaCapturistaImg !== ''): ?>
                 <img src="<?= vut_pdf_h($firmaCapturistaImg) ?>" style="max-width:230px; max-height:82px;"><br>
             <?php else: ?>
                 _______________________________________<br>
             <?php endif; ?>
+
             FIRMA DEL CAPTURISTA / VUT
         </td>
     </tr>
+
+    <?php if ($mostrarFirmaRecibido): ?>
+        <tr>
+            <td colspan="2" style="padding-top:18px;">
+                <div style="width:55%; margin:0 auto; text-align:center;">
+                    <img src="<?= vut_pdf_h($firmaRecibidoImg) ?>" style="max-width:260px; max-height:90px;"><br>
+
+                    <strong>FIRMA DE RECIBIDO</strong>
+
+                    <?php if ($firmaRecibidoNombre !== ''): ?>
+                        <br>
+                        <span style="font-size:8px;">
+                            RECIBE: <?= vut_pdf_h($firmaRecibidoNombre) ?>
+                        </span>
+                    <?php endif; ?>
+
+                    <?php if ($firmaRecibidoFecha !== ''): ?>
+                        <br>
+                        <span style="font-size:8px;">
+                            FECHA: <?= vut_pdf_h($firmaRecibidoFecha) ?>
+                        </span>
+                    <?php endif; ?>
+
+                    <?php if ($firmaRecibidoObservaciones !== ''): ?>
+                        <br>
+                        <span style="font-size:7.5px;color:#777;">
+                            <?= vut_pdf_h($firmaRecibidoObservaciones) ?>
+                        </span>
+                    <?php endif; ?>
+                </div>
+            </td>
+        </tr>
+    <?php endif; ?>
 </table>
 
 <div class="footer-note">

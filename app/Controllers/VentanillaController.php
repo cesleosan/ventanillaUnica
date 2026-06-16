@@ -786,6 +786,128 @@ private $db;
         ];
     }
 
+
+
+/**
+ * Normaliza texto para comparar trámites del catálogo.
+ */
+private function normalizarTextoCatalogo(string $value): string {
+    $value = trim($value);
+    $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+    $value = $value === false ? '' : $value;
+    $value = strtoupper($value);
+    $value = preg_replace('/\s+/', ' ', $value);
+    return trim((string)$value);
+}
+
+/**
+ * Obtiene detalles del trámite desde el catálogo interno.
+ */
+private function obtenerDetallesCatalogoTramite(string $materia, string $tramite): array {
+    $catalogo = $this->getCatalogoTramites();
+    $materiaNorm = $this->normalizarTextoCatalogo($materia);
+    $tramiteNorm = $this->normalizarTextoCatalogo($tramite);
+
+    foreach ($catalogo as $materiaKey => $tramites) {
+        if ($this->normalizarTextoCatalogo((string)$materiaKey) !== $materiaNorm) {
+            continue;
+        }
+
+        foreach ($tramites as $tramiteKey => $info) {
+            if ($this->normalizarTextoCatalogo((string)$tramiteKey) === $tramiteNorm) {
+                return is_array($info['detalles'] ?? null) ? $info['detalles'] : [];
+            }
+        }
+    }
+
+    return [];
+}
+
+/**
+ * Extrae el número de días del texto de tiempo del trámite.
+ * Ejemplos: "30 Días Hábiles" => 30, "Inmediata" => 0, "Indefinido" => null.
+ */
+private function extraerDiasPlazo(?string $tiempo): ?int {
+    $tiempo = trim((string)$tiempo);
+
+    if ($tiempo === '') {
+        return null;
+    }
+
+    $normal = $this->normalizarTextoCatalogo($tiempo);
+
+    if (strpos($normal, 'INMEDIATA') !== false || strpos($normal, 'INMEDIATO') !== false) {
+        return 0;
+    }
+
+    if (strpos($normal, 'INDEFINIDO') !== false) {
+        return null;
+    }
+
+    if (preg_match('/(\d+)/', $normal, $m)) {
+        return (int)$m[1];
+    }
+
+    return null;
+}
+
+/**
+ * Suma días hábiles de lunes a viernes. No considera feriados todavía.
+ */
+private function sumarDiasHabiles(string $fechaBase, int $dias): string {
+    $fecha = new \DateTime($fechaBase);
+    $fecha->setTime(0, 0, 0);
+
+    if ($dias <= 0) {
+        return $fecha->format('Y-m-d');
+    }
+
+    $agregados = 0;
+
+    while ($agregados < $dias) {
+        $fecha->modify('+1 day');
+        $diaSemana = (int)$fecha->format('N');
+
+        if ($diaSemana <= 5) {
+            $agregados++;
+        }
+    }
+
+    return $fecha->format('Y-m-d');
+}
+
+/**
+ * Agrega al payload el plazo y la fecha estimada de entrega.
+ */
+private function enriquecerPayloadFechasEntrega(array $payload): array {
+    $solicitud = $payload['solicitud'] ?? [];
+    if (!is_array($solicitud)) {
+        $solicitud = [];
+    }
+
+    $materia = (string)($solicitud['materia'] ?? '');
+    $tramite = (string)($solicitud['tramite'] ?? '');
+
+    $detalles = $payload['tramite_detalles'] ?? [];
+    if (!is_array($detalles) || empty($detalles)) {
+        $detalles = $this->obtenerDetallesCatalogoTramite($materia, $tramite);
+    }
+
+    $plazo = trim((string)($detalles['tiempo'] ?? $solicitud['plazo_tramite'] ?? ''));
+    $dias = $this->extraerDiasPlazo($plazo);
+    $fechaBase = date('Y-m-d');
+    $fechaEstimada = $dias === null ? null : $this->sumarDiasHabiles($fechaBase, $dias);
+
+    $payload['tramite_detalles'] = $detalles;
+    $payload['solicitud']['plazo_tramite'] = $plazo;
+    $payload['solicitud']['fecha_estimada_entrega'] = $fechaEstimada;
+    $payload['solicitud']['fecha_ingreso_calculada'] = date('Y-m-d H:i:s');
+    $payload['META_TIEMPO_RESPUESTA'] = $plazo;
+    $payload['META_FECHA_ESTIMADA_ENTREGA'] = $fechaEstimada;
+
+    return $payload;
+}
+
    public function guardar() {
     /**
      * Guarda la solicitud completa recibida desde JS.
@@ -838,6 +960,8 @@ private $db;
         if (empty($payload['solicitud']['tramite'])) {
             throw new \Exception("No se recibió el trámite de la solicitud.");
         }
+
+        $payload = $this->enriquecerPayloadFechasEntrega($payload);
 
         $modelo = new \Ventanilla($dbConn);
         $resultado = $modelo->guardarSolicitudCompleta($payload);
@@ -1101,6 +1225,13 @@ private function prepararDatosParaAcuse(array $registro): array
     $firmas = $payload['firmas']
         ?? ($registro['firmas'] ?? []);
 
+    $firmaRecibido = $payload['firma_recibido']
+        ?? ($registro['firma_recibido_datos'] ?? []);
+
+    if (!is_array($firmaRecibido)) {
+        $firmaRecibido = [];
+    }
+
     $requisitosValidados = $payload['requisitos_validados']
         ?? ($registro['requisitos_validados'] ?? []);
 
@@ -1153,6 +1284,41 @@ private function prepararDatosParaAcuse(array $registro): array
     $datos['recibos'] = $recibos;
     $datos['requisitos_validados'] = $requisitosValidados;
     $datos['firmas'] = is_array($firmas) ? $firmas : [];
+    $datos['firma_recibido'] = $firmaRecibido;
+
+    /**
+     * Firma adicional de recibido/autorizado.
+     * Se guarda cuando el trámite pasa a APROBADO, mostrado como AUTORIZADO.
+     */
+    $datos['ESTADO_PROCESO'] = strtoupper($this->valDesde(
+        [$registro, $datos],
+        ['ESTADO_PROCESO', 'estado_proceso'],
+        ''
+    ));
+
+    $datos['FIRMA_RECIBIDO'] = $this->valDesde(
+        [$firmaRecibido, $registro, $datos],
+        ['imagen', 'FIRMA_RECIBIDO', 'firma_recibido'],
+        ''
+    );
+
+    $datos['FIRMA_RECIBIDO_NOMBRE'] = $this->valDesde(
+        [$firmaRecibido, $registro, $datos],
+        ['nombre', 'FIRMA_RECIBIDO_NOMBRE', 'firma_recibido_nombre'],
+        ''
+    );
+
+    $datos['FIRMA_RECIBIDO_FECHA'] = $this->valDesde(
+        [$firmaRecibido, $registro, $datos],
+        ['fecha', 'FIRMA_RECIBIDO_FECHA', 'firma_recibido_fecha'],
+        ''
+    );
+
+    $datos['FIRMA_RECIBIDO_OBSERVACIONES'] = $this->valDesde(
+        [$firmaRecibido, $registro, $datos],
+        ['observaciones', 'FIRMA_RECIBIDO_OBSERVACIONES', 'firma_recibido_observaciones'],
+        ''
+    );
 
     /**
      * Encabezado.
@@ -1173,6 +1339,18 @@ private function prepararDatosParaAcuse(array $registro): array
         [$registro, $datos],
         ['fecha_ingreso', 'fecha_creacion', 'created_at', 'FECHA_INGRESO'],
         date('Y-m-d H:i:s')
+    );
+
+    $datos['PLAZO_TRAMITE'] = $this->valDesde(
+        [$solicitud, $registro, $datos],
+        ['plazo_tramite', 'PLAZO_TRAMITE', 'META_TIEMPO_RESPUESTA'],
+        ''
+    );
+
+    $datos['FECHA_ESTIMADA_ENTREGA'] = $this->valDesde(
+        [$solicitud, $registro, $datos],
+        ['fecha_estimada_entrega', 'FECHA_ESTIMADA_ENTREGA', 'META_FECHA_ESTIMADA_ENTREGA'],
+        ''
     );
 
     $datos['OBSERVACIONES'] = $this->limpiarValor($observaciones, '');
@@ -1714,6 +1892,8 @@ public function actualizar() {
 
         unset($payload['id_solicitud'], $payload['id']);
 
+        $payload = $this->enriquecerPayloadFechasEntrega($payload);
+
         $modelo = new \Ventanilla($this->db);
 
         if (!method_exists($modelo, 'actualizarSolicitudCompleta')) {
@@ -1844,6 +2024,11 @@ public function cambiarEstado() {
         $idSolicitud = (int)($payload['id_solicitud'] ?? $payload['id'] ?? 0);
         $estadoNuevo = strtoupper(trim((string)($payload['estado'] ?? $payload['estado_nuevo'] ?? '')));
         $observaciones = trim((string)($payload['observaciones'] ?? ''));
+        $firmaRecibido = $payload['firma_recibido'] ?? null;
+
+        if (!is_array($firmaRecibido)) {
+            $firmaRecibido = null;
+        }
 
         if ($idSolicitud <= 0) {
             throw new \Exception('ID de solicitud inválido.');
@@ -1876,7 +2061,8 @@ public function cambiarEstado() {
             $estadoNuevo,
             $observaciones,
             $usuarioId,
-            $usuarioNombre
+            $usuarioNombre,
+            $firmaRecibido
         );
 
         if (empty($resultado['success'])) {

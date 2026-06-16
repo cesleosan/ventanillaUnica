@@ -5,6 +5,7 @@ session_start();
 
 require_once '../app/Controllers/DashboardController.php';
 require_once '../app/Controllers/VentanillaController.php';
+require_once '../app/Controllers/UsuariosController.php';
 
 $page = $_GET['route'] ?? 'home';
 
@@ -61,6 +62,22 @@ try {
         case 'ventanilla/detalle':
             $controller = new VentanillaController();
             $controller->detalle();
+            break;
+
+        case 'usuarios':
+        case 'usuarios/index':
+            $controller = new UsuariosController();
+            $controller->index();
+            break;
+
+        case 'usuarios/guardar':
+            $controller = new UsuariosController();
+            $controller->guardar();
+            break;
+
+        case 'usuarios/toggle':
+            $controller = new UsuariosController();
+            $controller->toggle();
             break;
 
         default:

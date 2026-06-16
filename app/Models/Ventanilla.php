@@ -79,6 +79,60 @@ class Ventanilla {
     }
 
     /**
+     * Texto ciudadano: mayúsculas y sin acentos.
+     * No se aplica a firmas, imágenes ni correos.
+     */
+    private function textoMayusculasSinAcentos($value): string {
+        $value = trim((string)$value);
+        $normalizado = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+
+        if ($normalizado === false) {
+            $normalizado = $value;
+        }
+
+        $normalizado = strtoupper($normalizado);
+        $normalizado = preg_replace('/\s+/', ' ', $normalizado);
+
+        return trim((string)$normalizado);
+    }
+
+    /**
+     * Normaliza recursivamente el payload de captura.
+     */
+    private function normalizarPayloadTexto($data, string $key = '') {
+        if (is_array($data)) {
+            $out = [];
+
+            foreach ($data as $k => $v) {
+                $out[$k] = $this->normalizarPayloadTexto($v, (string)$k);
+            }
+
+            return $out;
+        }
+
+        if (!is_string($data)) {
+            return $data;
+        }
+
+        $keyNorm = strtolower($key);
+        $value = trim($data);
+
+        if ($value === '') {
+            return $value;
+        }
+
+        if (strpos($value, 'data:image/') === 0 || strpos($keyNorm, 'imagen') !== false || strpos($keyNorm, 'firma') !== false) {
+            return $data;
+        }
+
+        if (strpos($keyNorm, 'email') !== false || strpos($keyNorm, 'correo') !== false) {
+            return strtolower(str_replace(' ', '', $value));
+        }
+
+        return $this->textoMayusculasSinAcentos($value);
+    }
+
+    /**
      * Revisa si existe una tabla.
      * Versión robusta para servidor: usa INFORMATION_SCHEMA.
      */
@@ -217,6 +271,34 @@ class Ventanilla {
     }
 
     /**
+     * Actualiza columnas opcionales de solicitudes sin romper si aún no existen.
+     */
+    private function actualizarColumnasSolicitud(int $idSolicitud, array $data): void {
+        if ($idSolicitud <= 0 || empty($data)) {
+            return;
+        }
+
+        $sets = [];
+        $params = [];
+
+        foreach ($data as $column => $value) {
+            if ($this->columnExists('solicitudes', $column)) {
+                $sets[] = "`{$column}` = ?";
+                $params[] = $value;
+            }
+        }
+
+        if (empty($sets)) {
+            return;
+        }
+
+        $params[] = $idSolicitud;
+        $sql = 'UPDATE solicitudes SET ' . implode(', ', $sets) . ' WHERE id_solicitud = ?';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+    }
+
+    /**
      * Ejecuta SELECT y devuelve una fila.
      */
     private function fetchOne(string $sql, array $params = []) {
@@ -323,6 +405,8 @@ class Ventanilla {
             if (!is_array($data)) {
                 throw new \Exception("Payload inválido.");
             }
+
+            $data = $this->normalizarPayloadTexto($data);
 
             $folio = "V-" . date('Ymd') . "-" . strtoupper(substr(uniqid(), -4));
 
@@ -477,6 +561,11 @@ class Ventanilla {
 
                 throw new \Exception("Error al registrar solicitud principal: " . $e->getMessage());
             }
+
+            $this->actualizarColumnasSolicitud((int)$id_solicitud, [
+                'plazo_tramite' => $this->limpiar($sol['plazo_tramite'] ?? ($data['META_TIEMPO_RESPUESTA'] ?? null)),
+                'fecha_estimada_entrega' => $this->limpiar($sol['fecha_estimada_entrega'] ?? ($data['META_FECHA_ESTIMADA_ENTREGA'] ?? null))
+            ]);
 
             /**
              * 2. DATOS DEL INTERESADO
@@ -1234,6 +1323,32 @@ class Ventanilla {
             }
         }
 
+        /**
+         * Plazo y fecha estimada de entrega.
+         */
+        $payload['solicitud']['plazo_tramite'] = $solicitud['plazo_tramite'] ?? ($payload['solicitud']['plazo_tramite'] ?? '');
+        $payload['solicitud']['fecha_estimada_entrega'] = $solicitud['fecha_estimada_entrega'] ?? ($payload['solicitud']['fecha_estimada_entrega'] ?? '');
+        $solicitud['PLAZO_TRAMITE'] = $payload['solicitud']['plazo_tramite'];
+        $solicitud['FECHA_ESTIMADA_ENTREGA'] = $payload['solicitud']['fecha_estimada_entrega'];
+
+        /**
+         * Firma adicional de recibido/autorizado.
+         */
+        $firmaRecibidoDatos = [
+            'imagen' => $solicitud['firma_recibido'] ?? '',
+            'nombre' => $solicitud['firma_recibido_nombre'] ?? '',
+            'fecha' => $solicitud['firma_recibido_fecha'] ?? '',
+            'observaciones' => $solicitud['firma_recibido_observaciones'] ?? ''
+        ];
+
+        $payload['firma_recibido'] = $firmaRecibidoDatos;
+        $solicitud['firma_recibido_datos'] = $firmaRecibidoDatos;
+        $solicitud['ESTADO_PROCESO'] = strtoupper((string)($solicitud['estado_proceso'] ?? ''));
+        $solicitud['FIRMA_RECIBIDO'] = $firmaRecibidoDatos['imagen'];
+        $solicitud['FIRMA_RECIBIDO_NOMBRE'] = $firmaRecibidoDatos['nombre'];
+        $solicitud['FIRMA_RECIBIDO_FECHA'] = $firmaRecibidoDatos['fecha'];
+        $solicitud['FIRMA_RECIBIDO_OBSERVACIONES'] = $firmaRecibidoDatos['observaciones'];
+
         $solicitud['_payload_raw'] = $payloadRaw;
 
         return array_merge($solicitud, $payload);
@@ -1267,7 +1382,7 @@ class Ventanilla {
             'EN_VALIDACION' => 'En validación',
             'PREVENIDO'     => 'Prevenido',
             'EN_REVISION'   => 'En revisión',
-            'APROBADO'      => 'Aprobado',
+            'APROBADO'      => 'Autorizado',
             'RECHAZADO'     => 'Rechazado',
             'TERMINADO'     => 'Terminado',
             'CANCELADO'     => 'Cancelado'
@@ -1524,7 +1639,8 @@ class Ventanilla {
         string $estadoNuevo,
         string $observaciones = '',
         ?int $usuarioId = null,
-        ?string $usuarioNombre = null
+        ?string $usuarioNombre = null,
+        ?array $firmaRecibido = null
     ): array {
         $estadoNuevo = strtoupper(trim($estadoNuevo));
 
@@ -1548,6 +1664,43 @@ class Ventanilla {
             ? (string)($actual['estado_proceso'] ?? 'NUEVO')
             : (string)($actual['estatus'] ?? 'NUEVO');
 
+        $requiereFirmaRecibido = ($estadoNuevo === 'APROBADO');
+        $firmaImagen = '';
+        $firmaNombre = '';
+        $firmaFecha = date('Y-m-d H:i:s');
+        $firmaObservaciones = '';
+
+        if ($requiereFirmaRecibido) {
+            $firmaImagen = trim((string)($firmaRecibido['imagen'] ?? ''));
+            $firmaNombre = $this->limpiar($firmaRecibido['nombre'] ?? null) ?? '';
+            $firmaObservaciones = $this->limpiar($firmaRecibido['observaciones'] ?? null) ?? '';
+            $firmaFechaRaw = trim((string)($firmaRecibido['fecha'] ?? ''));
+
+            if ($firmaFechaRaw !== '') {
+                $timestampFirma = strtotime($firmaFechaRaw);
+                if ($timestampFirma !== false) {
+                    $firmaFecha = date('Y-m-d H:i:s', $timestampFirma);
+                }
+            }
+
+            $yaTieneFirma = trim((string)($actual['firma_recibido'] ?? '')) !== '';
+            $firmaNuevaValida = preg_match('/^data:image\/(png|jpeg|jpg);base64,/i', $firmaImagen) === 1;
+
+            if (!$firmaNuevaValida && !$yaTieneFirma) {
+                return [
+                    'success' => false,
+                    'error' => 'La firma de recibido es obligatoria para autorizar el trámite.'
+                ];
+            }
+
+            if ($firmaNuevaValida && strlen($firmaNombre) < 3) {
+                return [
+                    'success' => false,
+                    'error' => 'Captura el nombre de quien recibe la autorización.'
+                ];
+            }
+        }
+
         try {
             if (!$this->db->inTransaction()) {
                 $this->db->beginTransaction();
@@ -1566,7 +1719,7 @@ class Ventanilla {
 
             if ($this->columnExists('solicitudes', 'etapa_actual')) {
                 $sets[] = 'etapa_actual = ?';
-                $params[] = $estadoNuevo;
+                $params[] = $estadoNuevo === 'APROBADO' ? 'AUTORIZADO' : $estadoNuevo;
             }
 
             if ($this->columnExists('solicitudes', 'estado_observaciones')) {
@@ -1577,6 +1730,33 @@ class Ventanilla {
             if ($estadoNuevo === 'RECHAZADO' && $this->columnExists('solicitudes', 'motivo_rechazo')) {
                 $sets[] = 'motivo_rechazo = ?';
                 $params[] = $observaciones;
+            }
+
+            if ($requiereFirmaRecibido && preg_match('/^data:image\/(png|jpeg|jpg);base64,/i', $firmaImagen) === 1) {
+                if (!$this->columnExists('solicitudes', 'firma_recibido')) {
+                    return [
+                        'success' => false,
+                        'error' => 'Falta ejecutar el ALTER TABLE para guardar la firma de recibido.'
+                    ];
+                }
+
+                $sets[] = 'firma_recibido = ?';
+                $params[] = $firmaImagen;
+
+                if ($this->columnExists('solicitudes', 'firma_recibido_nombre')) {
+                    $sets[] = 'firma_recibido_nombre = ?';
+                    $params[] = $firmaNombre;
+                }
+
+                if ($this->columnExists('solicitudes', 'firma_recibido_fecha')) {
+                    $sets[] = 'firma_recibido_fecha = ?';
+                    $params[] = $firmaFecha;
+                }
+
+                if ($this->columnExists('solicitudes', 'firma_recibido_observaciones')) {
+                    $sets[] = 'firma_recibido_observaciones = ?';
+                    $params[] = $firmaObservaciones;
+                }
             }
 
             if ($this->columnExists('solicitudes', 'fecha_estado')) {
@@ -1600,11 +1780,18 @@ class Ventanilla {
             }
 
             if ($this->tableExists('historial_solicitud_estados')) {
+                $obsHistorial = $this->limpiar($observaciones);
+
+                if ($estadoNuevo === 'APROBADO' && $firmaNombre !== '') {
+                    $obsHistorial = trim((string)$obsHistorial);
+                    $obsHistorial .= ($obsHistorial !== '' ? ' | ' : '') . 'Firma de recibido capturada por: ' . $firmaNombre;
+                }
+
                 $this->insertarRegistro('historial_solicitud_estados', [
                     'id_solicitud'     => $idSolicitud,
                     'estado_anterior'  => $estadoAnterior,
                     'estado_nuevo'     => $estadoNuevo,
-                    'observaciones'    => $this->limpiar($observaciones),
+                    'observaciones'    => $this->limpiar($obsHistorial),
                     'usuario_id'       => $usuarioId,
                     'usuario_nombre'   => $this->limpiar($usuarioNombre)
                 ]);
@@ -1618,7 +1805,8 @@ class Ventanilla {
                 'success' => true,
                 'id' => $idSolicitud,
                 'estado_anterior' => $estadoAnterior,
-                'estado_nuevo' => $estadoNuevo
+                'estado_nuevo' => $estadoNuevo,
+                'firma_recibido_guardada' => ($estadoNuevo === 'APROBADO')
             ];
 
         } catch (\Throwable $e) {
@@ -1708,6 +1896,8 @@ class Ventanilla {
                 throw new \Exception('La solicitud que intentas editar no existe.');
             }
 
+            $data = $this->normalizarPayloadTexto($data);
+
             if (!$this->db->inTransaction()) {
                 $this->db->beginTransaction();
                 $ownTransaction = true;
@@ -1738,6 +1928,8 @@ class Ventanilla {
                 'modalidad_texto'     => $this->limpiar($this->val($bif, ['modalidad_texto', 'MODALIDAD_TEXTO'])),
                 'detalle'             => $this->limpiar($this->val($bif, ['detalle', 'DETALLE'])),
                 'detalle_texto'       => $this->limpiar($this->val($bif, ['detalle_texto', 'DETALLE_TEXTO'])),
+                'plazo_tramite'       => $this->limpiar($sol['plazo_tramite'] ?? ($data['META_TIEMPO_RESPUESTA'] ?? null)),
+                'fecha_estimada_entrega' => $this->limpiar($sol['fecha_estimada_entrega'] ?? ($data['META_FECHA_ESTIMADA_ENTREGA'] ?? null)),
             ];
 
             if ($this->columnExists('solicitudes', 'updated_at')) {
