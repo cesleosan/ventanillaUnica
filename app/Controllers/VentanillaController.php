@@ -20,6 +20,119 @@ private $db;
         $database = new \Database(); 
         $this->db = $database->getConnection();
     }
+
+    /**
+     * Usuario VUT autenticado en la sesión actual.
+     */
+    private function usuarioActualVut(): ?array {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $usuario = $_SESSION['user'] ?? null;
+
+        if (!is_array($usuario) || empty($usuario['id'])) {
+            return null;
+        }
+
+        $modulo = strtoupper((string)($usuario['modulo'] ?? $_SESSION['modulo'] ?? ''));
+
+        return $modulo === 'VUT' ? $usuario : null;
+    }
+
+    /**
+     * Exige una sesión VUT antes de mostrar o modificar información sensible.
+     */
+    private function exigirUsuarioVut(bool $json = false): array {
+        $usuario = $this->usuarioActualVut();
+
+        if ($usuario !== null) {
+            return $usuario;
+        }
+
+        if ($json) {
+            http_response_code(401);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'error' => 'Tu sesión no está activa. Inicia sesión para continuar.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        header('Location: index.php?route=home');
+        exit;
+    }
+
+    private function rolActualVut(): string {
+        $usuario = $this->usuarioActualVut();
+
+        return strtolower((string)(
+            $usuario['rol']
+            ?? $usuario['role']
+            ?? $_SESSION['rol']
+            ?? ''
+        ));
+    }
+
+    private function puedeVerTodasLasSolicitudes(): bool {
+        return in_array($this->rolActualVut(), ['root', 'supervisor', 'consulta', 'admin', 'administrador'], true);
+    }
+
+    private function puedeEditarSolicitudes(): bool {
+        return in_array($this->rolActualVut(), ['root', 'supervisor', 'capturista', 'admin', 'administrador'], true);
+    }
+
+    private function exigirPermisoEdicion(bool $json = false): void {
+        $this->exigirUsuarioVut($json);
+
+        if ($this->puedeEditarSolicitudes()) {
+            return;
+        }
+
+        if ($json) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'error' => 'Tu perfil es de consulta y no puede modificar solicitudes.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        http_response_code(403);
+        die('Tu perfil es de consulta y no puede modificar solicitudes.');
+    }
+
+    /**
+     * Restringe folios propios para capturistas y deja la vista global a perfiles autorizados.
+     */
+    private function exigirAccesoSolicitud(int $idSolicitud, bool $json = false): void {
+        $usuario = $this->exigirUsuarioVut($json);
+
+        if ($this->puedeVerTodasLasSolicitudes()) {
+            return;
+        }
+
+        $modelo = new \Ventanilla($this->db);
+
+        if ($modelo->solicitudPerteneceAUsuario($idSolicitud, (int)$usuario['id'])) {
+            return;
+        }
+
+        if ($json) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'error' => 'No tienes permiso para consultar este folio.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        http_response_code(403);
+        die('No tienes permiso para consultar este folio.');
+    }
     // Aquí simulamos la Base de Datos con la info de tu Word
     private function getCatalogoTramites() {
         return [
@@ -307,6 +420,7 @@ private $db;
                     ]
                 ],
                 'Solicitud de exención del pago de derechos por ejercer el comercio en la vía pública' => [
+                    'tipo_captura' => 'via_publica',
                     'requisitos' => [
                     'Formato TTLALPAN_SED_1, debidamente requisitado. (Original y copia)',
                     'Identificación Oficial (Credencial para votar, Pasaporte, Cédula Profesional o Cartilla del Servicio Militar Nacional) (Original y copia para cotejo)',
@@ -327,6 +441,7 @@ private $db;
                     ]
                 ],
                 'Permiso para ejercer el comercio en la vía pública personalísimo, temporal, revocable e intransferible y su renovación' => [
+                    'tipo_captura' => 'via_publica',
                     'requisitos' => [
                     'Formato TTLALPAN_PEC_1 debidamente requisitado. (Original y copia)',
                     'Identificación Oficial (credencial para votar, pasaporte, cartilla militar o para extranjeros FM-2 O FM-3).  (Original y copia para cotejo)',
@@ -734,23 +849,6 @@ private $db;
                         'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
                     ]
                 ],
-                'Expedición de copias certificadas que obren en los archivos de la Delegación' => [
-                    'requisitos' => [
-                    'Formato TTLALPAN_ ECS_2 debidamente requisitado. (Original y copia)',
-                    'Documentos de identificación oficial. (Original y copia para cotejo)',
-                    'Documentos de acreditación de personalidad jurídica. (Original y copia para cotejo)',
-                    'Documentos con los que se acredite interés jurídico, en original o copia certificada, y copia simple (ejemplo: Sentencia Judicial).',
-                    'Comprobante de pago de derechos por búsqueda y una vez que la autoridad señale el monto a pagar por las copias solicitadas'
-                    ],
-                    'detalles' => [
-                        'observaciones' => 'Trámite mediante el cual se solicita la expedición de copias simples o certificadas de los documentos que obran en los archivos de las dependencias, órganos desconcentrados y Alcaldías de la Administración Pública de la Ciudad de México.',
-                        'costo' => 'Sí. Art 248 Fracc V Código Fiscal Vigente',
-                        'materia' => '15 Obras',
-                        'tiempo' => '15 días hábiles',
-                        'en_linea' => 'No',
-                        'ubicacion' => 'Ventanilla Única de Trámites: Plaza de la Constitución # 1, Tlalpan Centro, C.P. 14000 de lunes a viernes de 9:00 a 14:00 h.'
-                    ]
-                ],
                 //Demolicion, suelo de conservacion, fusion/subdivision
                 'Constancia de Publicitación Vecinal para Construcciones que Requieren Registro de Manifestación Tipo B o C, Licencias Especiales' => [
                     'tipo_captura' => 'predio',
@@ -922,6 +1020,9 @@ private function enriquecerPayloadFechasEntrega(array $payload): array {
     header('Content-Type: application/json; charset=utf-8');
 
     try {
+        $usuario = $this->exigirUsuarioVut(true);
+        $this->exigirPermisoEdicion(true);
+
         if (!file_exists('../app/config/config.php')) {
             throw new \Exception("Config no encontrado.");
         }
@@ -960,6 +1061,14 @@ private function enriquecerPayloadFechasEntrega(array $payload): array {
         if (empty($payload['solicitud']['tramite'])) {
             throw new \Exception("No se recibió el trámite de la solicitud.");
         }
+
+        $payload['auditoria']['capturado_por'] = [
+            'id' => (int)$usuario['id'],
+            'usuario' => (string)($usuario['usuario'] ?? ''),
+            'nombre' => (string)($usuario['nombre'] ?? $usuario['name'] ?? ''),
+            'rol' => (string)($usuario['rol'] ?? $usuario['role'] ?? ''),
+            'fecha' => date('Y-m-d H:i:s')
+        ];
 
         $payload = $this->enriquecerPayloadFechasEntrega($payload);
 
@@ -1016,6 +1125,8 @@ public function generarComprobante() {
 
         die("Error: referencia de solicitud inválida o no proporcionada.");
     }
+
+    $this->exigirAccesoSolicitud((int)$id_solicitud, false);
 
     try {
         require_once '../app/config/config.php';
@@ -1288,7 +1399,7 @@ private function prepararDatosParaAcuse(array $registro): array
 
     /**
      * Firma adicional de recibido/autorizado.
-     * Se guarda cuando el trámite pasa a APROBADO, mostrado como AUTORIZADO.
+     * Se guarda cuando el trámite pasa a AUTORIZADO.
      */
     $datos['ESTADO_PROCESO'] = strtoupper($this->valDesde(
         [$registro, $datos],
@@ -1789,12 +1900,15 @@ public function index() {
     }
 
     try {
+        $usuario = $this->exigirUsuarioVut(false);
+        $this->exigirPermisoEdicion(false);
+
         $catalogoCompleto = $this->getCatalogoTramites();
         $materias = array_keys($catalogoCompleto);
 
         $data = [
             'pageTitle'     => 'Ventanilla Única de Trámites - Tlalpan',
-            'user'          => $_SESSION['user'] ?? null,
+            'user'          => $usuario,
             'materias'      => $materias,
             'catalogo_json' => $catalogoCompleto
         ];
@@ -1826,11 +1940,16 @@ public function editar() {
     }
 
     try {
+        $usuario = $this->exigirUsuarioVut(false);
+        $this->exigirPermisoEdicion(false);
+
         $idSolicitud = (int)($_GET['id'] ?? $_GET['id_solicitud'] ?? 0);
 
         if ($idSolicitud <= 0) {
             throw new \Exception('ID de solicitud inválido para edición.');
         }
+
+        $this->exigirAccesoSolicitud($idSolicitud, false);
 
         $modelo = new \Ventanilla($this->db);
 
@@ -1849,7 +1968,7 @@ public function editar() {
 
         $data = [
             'pageTitle'      => 'Editar solicitud VUT - Tlalpan',
-            'user'           => $_SESSION['user'] ?? null,
+            'user'           => $usuario,
             'materias'       => $materias,
             'catalogo_json'  => $catalogoCompleto,
             'modo_edicion'   => true,
@@ -1877,6 +1996,9 @@ public function actualizar() {
     header('Content-Type: application/json; charset=utf-8');
 
     try {
+        $usuario = $this->exigirUsuarioVut(true);
+        $this->exigirPermisoEdicion(true);
+
         $raw = file_get_contents('php://input');
         $payload = json_decode($raw, true);
 
@@ -1890,11 +2012,36 @@ public function actualizar() {
             throw new \Exception('ID de solicitud inválido para actualización.');
         }
 
+        $this->exigirAccesoSolicitud($idSolicitud, true);
+
         unset($payload['id_solicitud'], $payload['id']);
 
-        $payload = $this->enriquecerPayloadFechasEntrega($payload);
-
         $modelo = new \Ventanilla($this->db);
+
+        $auditoriaExistente = $modelo->obtenerAuditoriaSolicitud($idSolicitud);
+        $capturadoPor = $auditoriaExistente['capturado_por'] ?? null;
+
+        if (!is_array($capturadoPor) || empty($capturadoPor['id'])) {
+            $capturadoPor = [
+                'id' => (int)$usuario['id'],
+                'usuario' => (string)($usuario['usuario'] ?? ''),
+                'nombre' => (string)($usuario['nombre'] ?? $usuario['name'] ?? ''),
+                'rol' => (string)($usuario['rol'] ?? $usuario['role'] ?? ''),
+                'fecha' => date('Y-m-d H:i:s')
+            ];
+        }
+
+        $payload['auditoria'] = is_array($auditoriaExistente) ? $auditoriaExistente : [];
+        $payload['auditoria']['capturado_por'] = $capturadoPor;
+        $payload['auditoria']['actualizado_por'] = [
+            'id' => (int)$usuario['id'],
+            'usuario' => (string)($usuario['usuario'] ?? ''),
+            'nombre' => (string)($usuario['nombre'] ?? $usuario['name'] ?? ''),
+            'rol' => (string)($usuario['rol'] ?? $usuario['role'] ?? ''),
+            'fecha' => date('Y-m-d H:i:s')
+        ];
+
+        $payload = $this->enriquecerPayloadFechasEntrega($payload);
 
         if (!method_exists($modelo, 'actualizarSolicitudCompleta')) {
             throw new \Exception('El modelo todavía no tiene el método actualizarSolicitudCompleta().');
@@ -1929,15 +2076,17 @@ public function dashboard() {
     }
 
     try {
+        $usuario = $this->exigirUsuarioVut(false);
         $modelo = new \Ventanilla($this->db);
 
         $data = [
             'pageTitle' => 'Dashboard VUT - Bandeja de Trámites',
-            'user' => $_SESSION['user'] ?? null,
+            'user' => $usuario,
             'estados' => method_exists($modelo, 'etiquetasEstadosProceso') ? $modelo->etiquetasEstadosProceso() : [],
             'materias' => method_exists($modelo, 'obtenerMateriasDashboard') ? $modelo->obtenerMateriasDashboard() : [],
             'tramites' => method_exists($modelo, 'obtenerTramitesDashboard') ? $modelo->obtenerTramitesDashboard() : [],
-            'puede_aprobar' => $this->puedeAprobarEstados()
+            'puede_aprobar' => $this->puedeAprobarEstados(),
+            'puede_editar' => $this->puedeEditarSolicitudes()
         ];
 
         $viewContent = '../app/Views/ventanilla/dashboard.php';
@@ -1960,6 +2109,7 @@ public function dashboardData() {
     header('Content-Type: application/json; charset=utf-8');
 
     try {
+        $usuario = $this->exigirUsuarioVut(true);
         $modelo = new \Ventanilla($this->db);
 
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -1978,6 +2128,11 @@ public function dashboardData() {
             'limit' => $limit,
             'offset' => ($page - 1) * $limit
         ];
+
+        if (!$this->puedeVerTodasLasSolicitudes()) {
+            $filtros['solo_propias'] = true;
+            $filtros['usuario_id'] = (int)$usuario['id'];
+        }
 
         $lista = $modelo->listarSolicitudesDashboard($filtros);
         $resumen = $modelo->obtenerResumenDashboard($filtros);
@@ -2014,6 +2169,9 @@ public function cambiarEstado() {
     header('Content-Type: application/json; charset=utf-8');
 
     try {
+        $this->exigirUsuarioVut(true);
+        $this->exigirPermisoEdicion(true);
+
         $raw = file_get_contents('php://input');
         $payload = json_decode($raw, true);
 
@@ -2034,16 +2192,18 @@ public function cambiarEstado() {
             throw new \Exception('ID de solicitud inválido.');
         }
 
+        $this->exigirAccesoSolicitud($idSolicitud, true);
+
         if ($estadoNuevo === '') {
             throw new \Exception('Selecciona un estado válido.');
         }
 
-        $estadosFinales = ['APROBADO', 'RECHAZADO', 'TERMINADO', 'CANCELADO'];
+        $estadosFinales = ['AUTORIZADO', 'ENTREGADO', 'CANCELADO'];
         if (in_array($estadoNuevo, $estadosFinales, true) && !$this->puedeAprobarEstados()) {
             http_response_code(403);
             echo json_encode([
                 'success' => false,
-                'error' => 'No tienes permisos para aprobar, rechazar, terminar o cancelar trámites.'
+                'error' => 'No tienes permisos para autorizar, entregar o cancelar trámites.'
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             return;
         }
@@ -2093,11 +2253,14 @@ public function detalle() {
     header('Content-Type: application/json; charset=utf-8');
 
     try {
+        $this->exigirUsuarioVut(true);
         $idSolicitud = (int)($_GET['id'] ?? $_GET['id_solicitud'] ?? 0);
 
         if ($idSolicitud <= 0) {
             throw new \Exception('ID de solicitud inválido.');
         }
+
+        $this->exigirAccesoSolicitud($idSolicitud, true);
 
         $modelo = new \Ventanilla($this->db);
         $detalle = $modelo->obtenerDetalleDashboard($idSolicitud);
@@ -2135,11 +2298,12 @@ private function puedeAprobarEstados(): bool {
         session_start();
     }
 
-    $rol = $_SESSION['rol']
-        ?? ($_SESSION['user']['rol'] ?? '')
-        ?? ($_SESSION['user']['role'] ?? '');
+    $rol = $_SESSION['user']['rol']
+        ?? $_SESSION['user']['role']
+        ?? $_SESSION['rol']
+        ?? '';
 
-    return in_array(strtolower((string)$rol), ['root', 'admin', 'administrador'], true);
+    return in_array(strtolower((string)$rol), ['root', 'supervisor', 'admin', 'administrador'], true);
 }
 
 }

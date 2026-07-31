@@ -161,7 +161,7 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
     </div>
 
     <div class="flex items-center gap-3">
-        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Representante:</span>
+        <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Persona autorizada:</span>
         <select id="select-tipo-rep" onchange="actualizarPlantillaInteresado()" class="input-tlalpan text-xs font-bold rounded-lg py-1.5 px-4"></select>
     </div>
 
@@ -258,6 +258,7 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
         <select id="select-modalidad-alineamientos" class="input-tlalpan text-[11px] font-black rounded-lg py-1.5 px-4 border-indigo-200 text-indigo-800 bg-indigo-50">
             <option value="ALINEAMIENTO">Alineamiento</option>
             <option value="NUMERO">Número oficial</option>
+            <option value="ALINEAMIENTO_NUMERO">Alineamiento y número oficial</option>
         </select>
     </div>
     <div id="contenedor-tipo-seguridad" class="flex items-center gap-3 hidden animate-fade-in">
@@ -277,7 +278,7 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
     <div id="contenedor-tipo-subdivision" class="flex items-center gap-3 hidden animate-fade-in">
         <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modalidad:</span>
         <select id="select-modalidad-subdivision" class="input-tlalpan text-[11px] font-black rounded-lg py-1.5 px-4 border-indigo-200 text-indigo-800 bg-indigo-50">
-            <option value="NUEVO">Nuevo</option>
+            <option value="SUBDIVISION">Subdivisión</option>
             <option value="FUSION">Fusión</option>
             <option value="REVALIDACION">Revalidación</option>
         </select>
@@ -779,7 +780,29 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8 pt-2">
                     <div class="md:col-span-5">
                         <label class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Nombre del Mercado Público <span class="text-red-500">*</span></label>
-                        <input type="text" id="mercado_nombre" name="mercado_nombre" placeholder="MERCADO" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200">
+                        <select id="mercado_nombre" name="mercado_nombre" required class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200 bg-white">
+                            <option value="">Seleccione un mercado oficial...</option>
+                            <option value="0274 - ARTESANÍAS VASCO DE QUIROGA">0274 · ARTESANÍAS VASCO DE QUIROGA</option>
+                            <option value="0251 - COMIDAS HUIPULCO">0251 · COMIDAS HUIPULCO</option>
+                            <option value="0256 - DR. Y GRAL. JOSÉ GONZÁLEZ VARELA">0256 · DR. Y GRAL. JOSÉ GONZÁLEZ VARELA</option>
+                            <option value="0286 - FLORES SAN FERNANDO">0286 · FLORES SAN FERNANDO</option>
+                            <option value="0267 - FUENTES BROTANTES">0267 · FUENTES BROTANTES</option>
+                            <option value="0393 - HUESO PERIFÉRICO">0393 · HUESO PERIFÉRICO</option>
+                            <option value="0282 - ISIDRO FABELA">0282 · ISIDRO FABELA</option>
+                            <option value="0391 - JOSÉ MARÍA MORELOS Y PAVÓN">0391 · JOSÉ MARÍA MORELOS Y PAVÓN</option>
+                            <option value="0042 - LA PAZ">0042 · LA PAZ</option>
+                            <option value="0265 - LÁZARO CÁRDENAS">0265 · LÁZARO CÁRDENAS</option>
+                            <option value="0289 - MIGUEL HIDALGO">0289 · MIGUEL HIDALGO</option>
+                            <option value="1011 - MIRADOR">1011 · MIRADOR</option>
+                            <option value="0392 - PLAZA MEXICANA DEL SUR">0392 · PLAZA MEXICANA DEL SUR</option>
+                            <option value="0285 - SAN ANDRÉS TOTOLTEPEC">0285 · SAN ANDRÉS TOTOLTEPEC</option>
+                            <option value="0350 - SAN NICOLÁS TOTOLAPAN">0350 · SAN NICOLÁS TOTOLAPAN</option>
+                            <option value="0406 - TLALCOLIGIA">0406 · TLALCOLIGIA</option>
+                            <option value="0320 - TORRES DE PADIERNA">0320 · TORRES DE PADIERNA</option>
+                            <option value="0394 - VEINTICUATRO DE FEBRERO">0394 · VEINTICUATRO DE FEBRERO</option>
+                            <option value="1012 - VEINTIUNO DE ABRIL">1012 · VEINTIUNO DE ABRIL</option>
+                            <option value="0263 - VILLA COAPA">0263 · VILLA COAPA</option>
+                        </select>
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Local <span class="text-red-500">*</span></label>
@@ -844,6 +867,49 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
                 </div>
             </div>
         `,
+'via_publica': `
+    <div class="animate-fade-in">
+        <div class="mb-7 rounded-2xl border border-[#E6D4DD] bg-[#FCF7F9] px-5 py-4">
+            <p class="text-[10px] font-black uppercase tracking-[0.18em] text-tlalpan-vino">Ubicación exacta del espacio en vía pública</p>
+            <p class="mt-1 text-xs font-semibold leading-relaxed text-gray-500">Captura el punto donde se ejerce o se solicita ejercer la actividad. Esta ubicación se integrará al expediente.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
+            <div class="md:col-span-6">
+                <label for="via_publica_calle" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Calle, avenida o vialidad <span class="text-red-500">*</span></label>
+                <input type="text" id="via_publica_calle" name="via_publica_calle" required placeholder="Nombre de la vialidad" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200">
+            </div>
+            <div class="md:col-span-3">
+                <label for="via_publica_numero" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Número / puesto <span class="text-red-500">*</span></label>
+                <input type="text" id="via_publica_numero" name="via_publica_numero" required placeholder="S/N, puesto o referencia" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200">
+            </div>
+            <div class="md:col-span-3">
+                <label for="via_publica_cp" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Código postal <span class="text-red-500">*</span></label>
+                <input type="text" id="via_publica_cp" name="via_publica_cp" required inputmode="numeric" maxlength="5" placeholder="5 dígitos" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm text-center font-black border-gray-200">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
+            <div class="md:col-span-4">
+                <label for="via_publica_colonia" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Colonia, pueblo o barrio <span class="text-red-500">*</span></label>
+                <input type="text" id="via_publica_colonia" name="via_publica_colonia" required placeholder="Colonia / pueblo / barrio" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200">
+            </div>
+            <div class="md:col-span-4">
+                <label for="via_publica_entre_calle" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Entre calle <span class="text-red-500">*</span></label>
+                <input type="text" id="via_publica_entre_calle" name="via_publica_entre_calle" required placeholder="Primera calle" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200">
+            </div>
+            <div class="md:col-span-4">
+                <label for="via_publica_y_calle" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Y calle <span class="text-red-500">*</span></label>
+                <input type="text" id="via_publica_y_calle" name="via_publica_y_calle" required placeholder="Segunda calle" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200">
+            </div>
+        </div>
+
+        <div>
+            <label for="via_publica_referencias" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Referencias para localizar el punto <span class="text-red-500">*</span></label>
+            <textarea id="via_publica_referencias" name="via_publica_referencias" required rows="3" placeholder="Frente a, junto a, color del puesto o cualquier dato que permita ubicarlo sin ambigüedad" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-semibold border-gray-200 resize-y"></textarea>
+        </div>
+    </div>
+`,
 'predio': `
     <div class="animate-fade-in">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 pt-2">
@@ -1191,13 +1257,19 @@ function actualizarRequisitos() {
     const contenedorCaptura = document.getElementById('contenedor-dinamico-captura');
     const btnTabCaptura = document.getElementById('btn-predio'); 
 
-    // Solo habilitamos si el catálogo pide explícitamente predio o mercado
-    if (tipo === 'predio' || tipo === 'mercado') {
+    // Habilitamos la pestaña solo cuando el catálogo declara una captura específica.
+    const etiquetasCaptura = {
+        mercado: 'DATOS DEL MERCADO',
+        predio: 'DATOS DEL PREDIO',
+        via_publica: 'UBICACIÓN EN VÍA PÚBLICA'
+    };
+
+    if (plantillasCaptura[tipo]) {
         if (btnTabCaptura) {
             btnTabCaptura.classList.remove('hidden'); 
-            btnTabCaptura.innerText = (tipo === 'mercado') ? 'DATOS DEL MERCADO' : 'DATOS DEL PREDIO';
+            btnTabCaptura.innerText = etiquetasCaptura[tipo] || 'DATOS DE UBICACIÓN';
         }
-        if (contenedorCaptura && plantillasCaptura[tipo]) {
+        if (contenedorCaptura) {
             contenedorCaptura.innerHTML = plantillasCaptura[tipo];
         }
     } else {
@@ -1291,9 +1363,8 @@ function actualizarRequisitos() {
         contenedor.innerHTML = plantillasInteresado[tipoPersona];
     }
 
-    // Control de pestañas adicionales
-    // 1. Mostrar Representante Legal si se elige en Moral
-    if (tipoPersona === 'moral' && tipoRep === 'legal') {
+    // Para persona moral, el representante legal forma parte obligatoria del expediente.
+    if (tipoPersona === 'moral') {
         btnLegal.classList.remove('hidden');
     } else {
         btnLegal.classList.add('hidden');
@@ -1302,7 +1373,7 @@ function actualizarRequisitos() {
         }
     }
 
-    // 2. Mostrar Persona Autorizada
+    // La persona autorizada es una sección independiente.
     if (tipoRep === 'autorizada') {
         btnAutorizada.classList.remove('hidden');
     } else {
@@ -1318,7 +1389,6 @@ function actualizarRequisitos() {
     }, 100);
 }
 
-// Asegúrate de que tus funciones de cambio llamen a esta nueva lógica
 function cambiarOpcionesRepresentante() {
     const tipoPersona = document.getElementById('select-tipo-persona').value;
     const selectRep = document.getElementById('select-tipo-rep');
@@ -1327,7 +1397,7 @@ function cambiarOpcionesRepresentante() {
 
     if (tipoPersona === 'fisica') {
         const opciones = [
-            { val: 'representante', text: 'TIPO DE REPRESENTANTE' },
+            { val: 'representante', text: 'SIN PERSONA AUTORIZADA' },
             { val: 'autorizada', text: 'PERSONA AUTORIZADA' }
         ];
         opciones.forEach(opt => {
@@ -1337,8 +1407,7 @@ function cambiarOpcionesRepresentante() {
         });
     } else {
         const opciones = [
-            { val: 'autorizada', text: 'PERSONA AUTORIZADA' },
-            { val: 'legal', text: 'REPRESENTANTE LEGAL' }
+            { val: 'autorizada', text: 'PERSONA AUTORIZADA' }
         ];
         opciones.forEach(opt => {
             let o = document.createElement('option');
@@ -3222,7 +3291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html: `
                 <div style="text-align:left;">
                     <p>${window.VUT_EDIT_MODE ? 'Se actualizará la solicitud existente sin generar un folio nuevo.' : 'Se registrará la solicitud y se generará el acuse oficial.'}</p>
-                    <p style="font-size:12px;color:#6b7280;">Revisa que los requisitos, datos del interesado, predio/mercado y observaciones estén correctos.</p>
+                    <p style="font-size:12px;color:#6b7280;">Revisa que los requisitos, datos de las personas, ubicación y observaciones estén correctos.</p>
                 </div>
             `,
             confirmButtonText: window.VUT_EDIT_MODE ? 'Sí, actualizar' : 'Sí, finalizar',

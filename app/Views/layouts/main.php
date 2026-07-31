@@ -45,6 +45,7 @@ $nombreUsuarioLayout = $userLayout['nombre'] ?? $userLayout['name'] ?? 'USUARIO'
 $rolUsuarioLayout = strtolower((string)($userLayout['rol'] ?? $userLayout['role'] ?? $_SESSION['rol'] ?? ''));
 $moduloUsuarioLayout = strtoupper((string)($userLayout['modulo'] ?? $_SESSION['modulo'] ?? ''));
 $puedeUsuariosLayout = isset($userLayout) && in_array($rolUsuarioLayout, ['root', 'supervisor'], true) && $moduloUsuarioLayout === 'VUT';
+$puedeCapturarLayout = isset($userLayout) && in_array($rolUsuarioLayout, ['root', 'supervisor', 'capturista'], true) && $moduloUsuarioLayout === 'VUT';
 ?>
 
 <body class="flex flex-col min-h-screen">
@@ -66,9 +67,12 @@ $puedeUsuariosLayout = isset($userLayout) && in_array($rolUsuarioLayout, ['root'
             <div class="flex flex-col md:flex-row md:items-center gap-3">
                 <?php if (isset($userLayout)): ?>
                     <nav class="flex flex-wrap items-center gap-2 justify-start md:justify-end">
-                        <a href="/" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 hover:bg-[#FCF7F9] hover:text-[#773357] transition-all">Inicio</a>
+                        <a href="index.php?route=home" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 hover:bg-[#FCF7F9] hover:text-[#773357] transition-all">Inicio</a>
                         <a href="index.php?route=ventanilla" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-50 text-gray-600 hover:bg-[#FCF7F9] hover:text-[#773357] transition-all">Dashboard VUT</a>
-                        <a href="index.php?route=ventanilla/nueva" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#773357] text-white hover:bg-[#5b2743] transition-all">Nueva captura</a>
+
+                        <?php if ($puedeCapturarLayout): ?>
+                            <a href="index.php?route=ventanilla/nueva" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#773357] text-white hover:bg-[#5b2743] transition-all">Nueva captura</a>
+                        <?php endif; ?>
 
                         <?php if ($puedeUsuariosLayout): ?>
                             <a href="index.php?route=usuarios" class="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#FCF7F9] text-[#773357] border border-[#E6D4DD] hover:bg-[#773357] hover:text-white transition-all">👥 Usuarios</a>
@@ -85,7 +89,7 @@ $puedeUsuariosLayout = isset($userLayout) && in_array($rolUsuarioLayout, ['root'
                                 <?= htmlspecialchars($rolUsuarioLayout, ENT_QUOTES, 'UTF-8') ?><?= $moduloUsuarioLayout ? ' · ' . htmlspecialchars($moduloUsuarioLayout, ENT_QUOTES, 'UTF-8') : '' ?>
                             </span>
                         </div>
-                        <form method="POST" action="/" class="ml-2">
+                        <form method="POST" action="index.php?route=home" class="ml-2">
                             <input type="hidden" name="action" value="logout">
                             <button type="submit" class="p-2 hover:bg-red-50 text-red-400 hover:text-red-600 rounded-lg transition-colors" title="Cerrar Sesión">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

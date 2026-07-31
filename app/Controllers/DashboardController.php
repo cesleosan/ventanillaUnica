@@ -116,14 +116,14 @@ class DashboardController {
                         } else {
                             $this->iniciarSesionUsuario($usuario);
                             $this->registrarAcceso((int)$usuario['id']);
-                            header('Location: /');
+                            header('Location: index.php?route=ventanilla/dashboard');
                             exit;
                         }
                     }
                 }
             } elseif ($action === 'logout') {
                 session_destroy();
-                header('Location: /');
+                header('Location: index.php?route=home');
                 exit;
             }
         }

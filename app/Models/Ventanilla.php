@@ -329,6 +329,7 @@ class Ventanilla {
         $campo = str_replace(
             [
                 'MERCADO_',
+                'VIA_PUBLICA_',
                 'PREDIO_',
                 'PROPIETARIO_',
                 'BIFURCACION_',
@@ -338,6 +339,7 @@ class Ventanilla {
                 '-'
             ],
             [
+                '',
                 '',
                 '',
                 'PROPIETARIO ',
@@ -363,6 +365,7 @@ class Ventanilla {
         if (strpos($key, 'FOLIO_RECIBO_') === 0 || strpos($key, 'MONTO_RECIBO_') === 0) return 'recibos';
         if (strpos($key, 'PROPIETARIO_') === 0 || $key === 'CHECK_AGREGAR_PROPIETARIO') return 'propietario';
         if (strpos($key, 'MERCADO_') === 0) return 'mercado';
+        if (strpos($key, 'VIA_PUBLICA_') === 0) return 'via_publica';
         if (strpos($key, 'PREDIO_') === 0) return 'predio';
 
         return 'especificos';
@@ -1354,20 +1357,84 @@ class Ventanilla {
         return array_merge($solicitud, $payload);
     }
 
+    /**
+     * Recupera la bitácora de autoría guardada dentro del payload JSON.
+     */
+    public function obtenerAuditoriaSolicitud(int $idSolicitud): array {
+        if ($idSolicitud <= 0 || !$this->columnExists('solicitudes', 'payload')) {
+            return [];
+        }
+
+        $row = $this->fetchOne(
+            'SELECT payload FROM solicitudes WHERE id_solicitud = ? LIMIT 1',
+            [$idSolicitud]
+        );
+
+        $payload = json_decode((string)($row['payload'] ?? ''), true);
+
+        return is_array($payload['auditoria'] ?? null) ? $payload['auditoria'] : [];
+    }
+
+    /**
+     * Comprueba la propiedad del folio sin revelar sus datos al usuario solicitante.
+     */
+    public function solicitudPerteneceAUsuario(int $idSolicitud, int $usuarioId): bool {
+        if ($idSolicitud <= 0 || $usuarioId <= 0) {
+            return false;
+        }
+
+        $columnas = ['id_solicitud'];
+        $columnasPropietario = [];
+
+        foreach (['usuario_id', 'id_usuario', 'capturado_por_id', 'created_by'] as $columna) {
+            if ($this->columnExists('solicitudes', $columna)) {
+                $columnas[] = "`{$columna}`";
+                $columnasPropietario[] = $columna;
+            }
+        }
+
+        if ($this->columnExists('solicitudes', 'payload')) {
+            $columnas[] = 'payload';
+        }
+
+        $row = $this->fetchOne(
+            'SELECT ' . implode(', ', $columnas) . ' FROM solicitudes WHERE id_solicitud = ? LIMIT 1',
+            [$idSolicitud]
+        );
+
+        if (!$row) {
+            return false;
+        }
+
+        foreach ($columnasPropietario as $columna) {
+            if ((int)($row[$columna] ?? 0) === $usuarioId) {
+                return true;
+            }
+        }
+
+        $payload = json_decode((string)($row['payload'] ?? ''), true);
+        $capturadoPorId = (int)(
+            $payload['auditoria']['capturado_por']['id']
+            ?? $payload['meta_usuario']['id']
+            ?? 0
+        );
+
+        return $capturadoPorId === $usuarioId;
+    }
+
 
     /**
      * Estados oficiales del flujo VUT.
      */
     public function estadosProcesoPermitidos(): array {
         return [
-            'NUEVO',
             'INGRESADO',
-            'EN_VALIDACION',
-            'PREVENIDO',
-            'EN_REVISION',
-            'APROBADO',
-            'RECHAZADO',
-            'TERMINADO',
+            'EN_PROCESO',
+            'SUBSANE',
+            'PREVENCION',
+            'AUTORIZADO',
+            'CONSTANCIA_HECHOS',
+            'ENTREGADO',
             'CANCELADO'
         ];
     }
@@ -1377,15 +1444,14 @@ class Ventanilla {
      */
     public function etiquetasEstadosProceso(): array {
         return [
-            'NUEVO'         => 'Nuevo',
-            'INGRESADO'     => 'Ingresado',
-            'EN_VALIDACION' => 'En validación',
-            'PREVENIDO'     => 'Prevenido',
-            'EN_REVISION'   => 'En revisión',
-            'APROBADO'      => 'Autorizado',
-            'RECHAZADO'     => 'Rechazado',
-            'TERMINADO'     => 'Terminado',
-            'CANCELADO'     => 'Cancelado'
+            'INGRESADO'          => 'Ingresado',
+            'EN_PROCESO'         => 'En proceso',
+            'SUBSANE'            => 'Subsane',
+            'PREVENCION'         => 'Prevención',
+            'AUTORIZADO'         => 'Autorizado',
+            'CONSTANCIA_HECHOS'  => 'Constancia de hechos',
+            'ENTREGADO'          => 'Entregado',
+            'CANCELADO'          => 'Cancelado'
         ];
     }
 
@@ -1413,11 +1479,27 @@ class Ventanilla {
      */
     private function dashboardEstadoExpr(): string {
         if ($this->columnExists('solicitudes', 'estado_proceso')) {
-            return "COALESCE(NULLIF(s.estado_proceso, ''), 'INGRESADO')";
+            return "CASE
+                WHEN UPPER(COALESCE(s.estado_proceso, '')) IN ('', 'NUEVO') THEN 'INGRESADO'
+                WHEN UPPER(s.estado_proceso) IN ('EN_VALIDACION', 'EN_REVISION') THEN 'EN_PROCESO'
+                WHEN UPPER(s.estado_proceso) = 'PREVENIDO' THEN 'PREVENCION'
+                WHEN UPPER(s.estado_proceso) = 'APROBADO' THEN 'AUTORIZADO'
+                WHEN UPPER(s.estado_proceso) = 'TERMINADO' THEN 'ENTREGADO'
+                ELSE UPPER(s.estado_proceso)
+            END";
         }
 
         if ($this->columnExists('solicitudes', 'estatus')) {
-            return "CASE\n                WHEN UPPER(COALESCE(s.estatus, '')) IN ('APROBADO','RECHAZADO','TERMINADO','CANCELADO') THEN UPPER(s.estatus)\n                WHEN UPPER(COALESCE(s.estatus, '')) IN ('FINALIZADO','FINALIZADA') THEN 'INGRESADO'\n                ELSE 'NUEVO'\n            END";
+            return "CASE
+                WHEN UPPER(COALESCE(s.estatus, '')) IN ('AUTORIZADO','APROBADO') THEN 'AUTORIZADO'
+                WHEN UPPER(COALESCE(s.estatus, '')) IN ('ENTREGADO','TERMINADO') THEN 'ENTREGADO'
+                WHEN UPPER(COALESCE(s.estatus, '')) IN ('PREVENCION','PREVENIDO') THEN 'PREVENCION'
+                WHEN UPPER(COALESCE(s.estatus, '')) = 'SUBSANE' THEN 'SUBSANE'
+                WHEN UPPER(COALESCE(s.estatus, '')) = 'CONSTANCIA_HECHOS' THEN 'CONSTANCIA_HECHOS'
+                WHEN UPPER(COALESCE(s.estatus, '')) = 'CANCELADO' THEN 'CANCELADO'
+                WHEN UPPER(COALESCE(s.estatus, '')) IN ('EN_PROCESO','EN_VALIDACION','EN_REVISION') THEN 'EN_PROCESO'
+                ELSE 'INGRESADO'
+            END";
         }
 
         return "'INGRESADO'";
@@ -1502,6 +1584,30 @@ class Ventanilla {
             $params[] = $estado;
         }
 
+        if (!empty($filtros['solo_propias'])) {
+            $usuarioId = (int)($filtros['usuario_id'] ?? 0);
+            $ownerParts = [];
+
+            if ($usuarioId > 0) {
+                foreach (['usuario_id', 'id_usuario', 'capturado_por_id', 'created_by'] as $ownerColumn) {
+                    if ($this->columnExists('solicitudes', $ownerColumn)) {
+                        $ownerParts[] = "s.`{$ownerColumn}` = ?";
+                        $params[] = $usuarioId;
+                    }
+                }
+
+                if ($this->columnExists('solicitudes', 'payload')) {
+                    $ownerParts[] = "(
+                        JSON_VALID(s.payload)
+                        AND CAST(JSON_UNQUOTE(JSON_EXTRACT(s.payload, '$.auditoria.capturado_por.id')) AS UNSIGNED) = ?
+                    )";
+                    $params[] = $usuarioId;
+                }
+            }
+
+            $where[] = !empty($ownerParts) ? '(' . implode(' OR ', $ownerParts) . ')' : '1 = 0';
+        }
+
         $fechaInicio = trim((string)($filtros['fecha_inicio'] ?? ''));
         if ($fechaInicio !== '' && $fechaExpr !== 'NULL') {
             $where[] = "DATE({$fechaExpr}) >= ?";
@@ -1532,19 +1638,18 @@ class Ventanilla {
 
         $resumen = [
             'TOTAL'         => 0,
-            'NUEVO'         => 0,
             'INGRESADO'     => 0,
-            'EN_VALIDACION' => 0,
-            'PREVENIDO'     => 0,
-            'EN_REVISION'   => 0,
-            'APROBADO'      => 0,
-            'RECHAZADO'     => 0,
-            'TERMINADO'     => 0,
+            'EN_PROCESO'    => 0,
+            'SUBSANE'       => 0,
+            'PREVENCION'    => 0,
+            'AUTORIZADO'    => 0,
+            'CONSTANCIA_HECHOS' => 0,
+            'ENTREGADO'     => 0,
             'CANCELADO'     => 0
         ];
 
         foreach ($rows as $row) {
-            $estado = strtoupper((string)($row['estado'] ?? 'NUEVO'));
+            $estado = strtoupper((string)($row['estado'] ?? 'INGRESADO'));
             $total = (int)($row['total'] ?? 0);
 
             if (!array_key_exists($estado, $resumen)) {
@@ -1661,10 +1766,10 @@ class Ventanilla {
         }
 
         $estadoAnterior = $this->columnExists('solicitudes', 'estado_proceso')
-            ? (string)($actual['estado_proceso'] ?? 'NUEVO')
-            : (string)($actual['estatus'] ?? 'NUEVO');
+            ? (string)($actual['estado_proceso'] ?? 'INGRESADO')
+            : (string)($actual['estatus'] ?? 'INGRESADO');
 
-        $requiereFirmaRecibido = ($estadoNuevo === 'APROBADO');
+        $requiereFirmaRecibido = ($estadoNuevo === 'AUTORIZADO');
         $firmaImagen = '';
         $firmaNombre = '';
         $firmaFecha = date('Y-m-d H:i:s');
@@ -1719,7 +1824,7 @@ class Ventanilla {
 
             if ($this->columnExists('solicitudes', 'etapa_actual')) {
                 $sets[] = 'etapa_actual = ?';
-                $params[] = $estadoNuevo === 'APROBADO' ? 'AUTORIZADO' : $estadoNuevo;
+                $params[] = $estadoNuevo;
             }
 
             if ($this->columnExists('solicitudes', 'estado_observaciones')) {
@@ -1727,7 +1832,7 @@ class Ventanilla {
                 $params[] = $observaciones;
             }
 
-            if ($estadoNuevo === 'RECHAZADO' && $this->columnExists('solicitudes', 'motivo_rechazo')) {
+            if ($estadoNuevo === 'CANCELADO' && $this->columnExists('solicitudes', 'motivo_rechazo')) {
                 $sets[] = 'motivo_rechazo = ?';
                 $params[] = $observaciones;
             }
@@ -1763,13 +1868,23 @@ class Ventanilla {
                 $sets[] = 'fecha_estado = NOW()';
             }
 
-            if (in_array($estadoNuevo, ['APROBADO', 'RECHAZADO', 'TERMINADO', 'CANCELADO'], true) && $this->columnExists('solicitudes', 'fecha_resolucion')) {
+            if (in_array($estadoNuevo, ['AUTORIZADO', 'ENTREGADO', 'CANCELADO'], true) && $this->columnExists('solicitudes', 'fecha_resolucion')) {
                 $sets[] = 'fecha_resolucion = NOW()';
             }
 
             if ($this->columnExists('solicitudes', 'estatus')) {
                 $sets[] = 'estatus = ?';
-                $params[] = ($estadoNuevo === 'CANCELADO') ? 'cancelado' : 'finalizado';
+                $estatusMap = [
+                    'INGRESADO' => 'ingresado',
+                    'EN_PROCESO' => 'en_proceso',
+                    'SUBSANE' => 'subsane',
+                    'PREVENCION' => 'prevencion',
+                    'AUTORIZADO' => 'autorizado',
+                    'CONSTANCIA_HECHOS' => 'constancia_hechos',
+                    'ENTREGADO' => 'entregado',
+                    'CANCELADO' => 'cancelado'
+                ];
+                $params[] = $estatusMap[$estadoNuevo] ?? strtolower($estadoNuevo);
             }
 
             if (!empty($sets)) {
@@ -1782,7 +1897,7 @@ class Ventanilla {
             if ($this->tableExists('historial_solicitud_estados')) {
                 $obsHistorial = $this->limpiar($observaciones);
 
-                if ($estadoNuevo === 'APROBADO' && $firmaNombre !== '') {
+                if ($estadoNuevo === 'AUTORIZADO' && $firmaNombre !== '') {
                     $obsHistorial = trim((string)$obsHistorial);
                     $obsHistorial .= ($obsHistorial !== '' ? ' | ' : '') . 'Firma de recibido capturada por: ' . $firmaNombre;
                 }
@@ -1806,7 +1921,7 @@ class Ventanilla {
                 'id' => $idSolicitud,
                 'estado_anterior' => $estadoAnterior,
                 'estado_nuevo' => $estadoNuevo,
-                'firma_recibido_guardada' => ($estadoNuevo === 'APROBADO')
+                'firma_recibido_guardada' => ($estadoNuevo === 'AUTORIZADO')
             ];
 
         } catch (\Throwable $e) {

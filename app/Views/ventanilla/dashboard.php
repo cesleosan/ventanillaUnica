@@ -17,20 +17,20 @@ if (!isset($data) || !is_array($data)) {
 }
 
 $estados = $data['estados'] ?? [
-    'NUEVO' => 'Nuevo',
     'INGRESADO' => 'Ingresado',
-    'EN_VALIDACION' => 'En validación',
-    'PREVENIDO' => 'Prevenido',
-    'EN_REVISION' => 'En revisión',
-    'APROBADO' => 'Aprobado',
-    'RECHAZADO' => 'Rechazado',
-    'TERMINADO' => 'Terminado',
+    'EN_PROCESO' => 'En proceso',
+    'SUBSANE' => 'Subsane',
+    'ENTREGADO' => 'Entregado',
+    'CONSTANCIA_HECHOS' => 'Constancia de hechos',
+    'AUTORIZADO' => 'Autorizado',
+    'PREVENCION' => 'Prevención',
     'CANCELADO' => 'Cancelado'
 ];
 
 $materias = $data['materias'] ?? [];
 $tramites = $data['tramites'] ?? [];
 $puedeAprobar = !empty($data['puede_aprobar']);
+$puedeEditar = !empty($data['puede_editar']);
 ?>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -499,15 +499,23 @@ $puedeAprobar = !empty($data['puede_aprobar']);
         white-space: nowrap;
     }
 
-    .estado-NUEVO { background:#f3f4f6; color:#374151; }
     .estado-INGRESADO { background:#dbeafe; color:#1d4ed8; }
+    .estado-EN_PROCESO { background:#e0f2fe; color:#0369a1; }
+    .estado-SUBSANE { background:#fef3c7; color:#92400e; }
+    .estado-PREVENCION { background:#ffedd5; color:#9a3412; }
+    .estado-AUTORIZADO { background:#dcfce7; color:#166534; }
+    .estado-CONSTANCIA_HECHOS { background:#ede9fe; color:#6d28d9; }
+    .estado-ENTREGADO { background:#ccfbf1; color:#0f766e; }
+    .estado-CANCELADO { background:#f3f4f6; color:#6b7280; }
+
+    /* Compatibilidad visual para solicitudes registradas antes de este catálogo. */
+    .estado-NUEVO { background:#f3f4f6; color:#374151; }
     .estado-EN_VALIDACION { background:#e0f2fe; color:#0369a1; }
-    .estado-PREVENIDO { background:#fef3c7; color:#92400e; }
-    .estado-EN_REVISION { background:#ede9fe; color:#6d28d9; }
+    .estado-PREVENIDO { background:#ffedd5; color:#9a3412; }
+    .estado-EN_REVISION { background:#e0f2fe; color:#0369a1; }
     .estado-APROBADO { background:#dcfce7; color:#166534; }
     .estado-RECHAZADO { background:#fee2e2; color:#991b1b; }
     .estado-TERMINADO { background:#ccfbf1; color:#0f766e; }
-    .estado-CANCELADO { background:#f3f4f6; color:#6b7280; }
 
     .vut-row-actions {
         display: flex;
@@ -810,7 +818,9 @@ $puedeAprobar = !empty($data['puede_aprobar']);
 
             <div class="vut-actions">
                 <button type="button" onclick="vutDashboardReload()" class="vut-btn vut-btn-light">↻ Sincronizar</button>
-                <a href="index.php?route=ventanilla/nueva" class="vut-btn vut-btn-primary">+ Nueva solicitud</a>
+                <?php if ($puedeEditar): ?>
+                    <a href="index.php?route=ventanilla/nueva" class="vut-btn vut-btn-primary">+ Nueva solicitud</a>
+                <?php endif; ?>
             </div>
         </div>
     </section>
@@ -826,35 +836,35 @@ $puedeAprobar = !empty($data['puede_aprobar']);
             <h3 id="kpi-ingresado" class="vut-kpi-value">0</h3>
             <p class="vut-kpi-help">Acuse generado</p>
         </div>
-        <div onclick="vutSetEstadoFiltro('EN_VALIDACION')" class="vut-kpi vut-kpi-sky">
-            <p class="vut-kpi-label">Validación</p>
-            <h3 id="kpi-validacion" class="vut-kpi-value">0</h3>
-            <p class="vut-kpi-help">Revisión documental</p>
+        <div onclick="vutSetEstadoFiltro('EN_PROCESO')" class="vut-kpi vut-kpi-sky">
+            <p class="vut-kpi-label">En proceso</p>
+            <h3 id="kpi-proceso" class="vut-kpi-value">0</h3>
+            <p class="vut-kpi-help">En atención</p>
         </div>
-        <div onclick="vutSetEstadoFiltro('EN_REVISION')" class="vut-kpi vut-kpi-purple">
-            <p class="vut-kpi-label">En revisión</p>
-            <h3 id="kpi-revision" class="vut-kpi-value">0</h3>
-            <p class="vut-kpi-help">Área técnica / jurídica</p>
+        <div onclick="vutSetEstadoFiltro('SUBSANE')" class="vut-kpi vut-kpi-purple">
+            <p class="vut-kpi-label">Subsane</p>
+            <h3 id="kpi-subsane" class="vut-kpi-value">0</h3>
+            <p class="vut-kpi-help">En subsanación</p>
         </div>
-        <div onclick="vutSetEstadoFiltro('PREVENIDO')" class="vut-kpi vut-kpi-amber">
-            <p class="vut-kpi-label">Prevenidas</p>
-            <h3 id="kpi-prevenido" class="vut-kpi-value">0</h3>
+        <div onclick="vutSetEstadoFiltro('PREVENCION')" class="vut-kpi vut-kpi-amber">
+            <p class="vut-kpi-label">Prevención</p>
+            <h3 id="kpi-prevencion" class="vut-kpi-value">0</h3>
             <p class="vut-kpi-help">Requieren corrección</p>
         </div>
-        <div onclick="vutSetEstadoFiltro('APROBADO')" class="vut-kpi vut-kpi-green">
-            <p class="vut-kpi-label">Aprobadas</p>
-            <h3 id="kpi-aprobado" class="vut-kpi-value">0</h3>
+        <div onclick="vutSetEstadoFiltro('AUTORIZADO')" class="vut-kpi vut-kpi-green">
+            <p class="vut-kpi-label">Autorizadas</p>
+            <h3 id="kpi-autorizado" class="vut-kpi-value">0</h3>
             <p class="vut-kpi-help">Con visto bueno</p>
         </div>
-        <div onclick="vutSetEstadoFiltro('RECHAZADO')" class="vut-kpi vut-kpi-red">
-            <p class="vut-kpi-label">Rechazadas</p>
-            <h3 id="kpi-rechazado" class="vut-kpi-value">0</h3>
-            <p class="vut-kpi-help">No procedentes</p>
+        <div onclick="vutSetEstadoFiltro('CONSTANCIA_HECHOS')" class="vut-kpi vut-kpi-red">
+            <p class="vut-kpi-label">Constancias</p>
+            <h3 id="kpi-constancia" class="vut-kpi-value">0</h3>
+            <p class="vut-kpi-help">Constancia de hechos</p>
         </div>
-        <div onclick="vutSetEstadoFiltro('TERMINADO')" class="vut-kpi vut-kpi-teal">
-            <p class="vut-kpi-label">Terminadas</p>
-            <h3 id="kpi-terminado" class="vut-kpi-value">0</h3>
-            <p class="vut-kpi-help">Cerradas</p>
+        <div onclick="vutSetEstadoFiltro('ENTREGADO')" class="vut-kpi vut-kpi-teal">
+            <p class="vut-kpi-label">Entregadas</p>
+            <h3 id="kpi-entregado" class="vut-kpi-value">0</h3>
+            <p class="vut-kpi-help">Concluidas</p>
         </div>
     </section>
 
@@ -982,6 +992,7 @@ $puedeAprobar = !empty($data['puede_aprobar']);
         clientMode: false,
         estadoFiltro: '',
         puedeAprobar: <?= $puedeAprobar ? 'true' : 'false' ?>,
+        puedeEditar: <?= $puedeEditar ? 'true' : 'false' ?>,
         estados: <?= json_encode($estados, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
 
@@ -1009,7 +1020,16 @@ $puedeAprobar = !empty($data['puede_aprobar']);
     }
 
     function estadoLabel(estado) {
-        return window.VUT_DASHBOARD.estados[estado] || estado || 'NUEVO';
+        const compatibilidad = {
+            NUEVO: 'Ingresado',
+            EN_VALIDACION: 'En proceso',
+            EN_REVISION: 'En proceso',
+            PREVENIDO: 'Prevención',
+            APROBADO: 'Autorizado',
+            TERMINADO: 'Entregado'
+        };
+
+        return window.VUT_DASHBOARD.estados[estado] || compatibilidad[estado] || estado || 'INGRESADO';
     }
 
     function formatFecha(fecha, withTime = false) {
@@ -1167,12 +1187,12 @@ $puedeAprobar = !empty($data['puede_aprobar']);
     function renderKPIs(summary) {
         document.getElementById('kpi-total').innerText = summary.TOTAL || 0;
         document.getElementById('kpi-ingresado').innerText = summary.INGRESADO || 0;
-        document.getElementById('kpi-validacion').innerText = summary.EN_VALIDACION || 0;
-        document.getElementById('kpi-revision').innerText = summary.EN_REVISION || 0;
-        document.getElementById('kpi-prevenido').innerText = summary.PREVENIDO || 0;
-        document.getElementById('kpi-aprobado').innerText = summary.APROBADO || 0;
-        document.getElementById('kpi-rechazado').innerText = summary.RECHAZADO || 0;
-        document.getElementById('kpi-terminado').innerText = summary.TERMINADO || 0;
+        document.getElementById('kpi-proceso').innerText = summary.EN_PROCESO || 0;
+        document.getElementById('kpi-subsane').innerText = summary.SUBSANE || 0;
+        document.getElementById('kpi-prevencion').innerText = summary.PREVENCION || 0;
+        document.getElementById('kpi-autorizado').innerText = summary.AUTORIZADO || 0;
+        document.getElementById('kpi-constancia').innerText = summary.CONSTANCIA_HECHOS || 0;
+        document.getElementById('kpi-entregado').innerText = summary.ENTREGADO || 0;
     }
 
     function renderRows(rows) {
@@ -1191,13 +1211,19 @@ $puedeAprobar = !empty($data['puede_aprobar']);
 
         tbody.innerHTML = rows.map(row => {
             const id = Number(row.id_solicitud || row.id || 0);
-            const estado = row.estado_proceso || 'NUEVO';
+            const estado = row.estado_proceso || 'INGRESADO';
             const modalidad = [row.modalidad_texto, row.detalle_texto].filter(Boolean).join(' / ') || 'SIN MODALIDAD';
             const fecha = formatFecha(row.fecha_ingreso || row.fecha_creacion || row.created_at);
             const titular = row.titular && String(row.titular).trim() !== '' ? row.titular : 'SIN INTERESADO';
             const telefono = row.telefono ? `<div class="vut-mini">TEL. ${vutDashEsc(row.telefono)}</div>` : '';
             const prioridad = row.prioridad && row.prioridad !== 'NORMAL'
                 ? `<div class="vut-mini" style="color:#92400e;">PRIORIDAD: ${vutDashEsc(row.prioridad)}</div>`
+                : '';
+            const editarAction = window.VUT_DASHBOARD.puedeEditar
+                ? `<a class="vut-action" title="Editar / continuar captura" href="index.php?route=ventanilla/editar&id=${encodeURIComponent(id)}">✏️</a>`
+                : '';
+            const estadoAction = window.VUT_DASHBOARD.puedeEditar
+                ? `<button type="button" class="vut-action state" title="Cambiar estado" onclick="abrirCambioEstado(${id}, '${vutDashEsc(estado)}')">↺</button>`
                 : '';
 
             return `
@@ -1241,11 +1267,7 @@ $puedeAprobar = !empty($data['puede_aprobar']);
 
                     <td>
                         <div class="vut-row-actions">
-                            <a
-                                class="vut-action"
-                                title="Editar / continuar captura"
-                                href="index.php?route=ventanilla/editar&id=${encodeURIComponent(id)}"
-                            >✏️</a>
+                            ${editarAction}
 
                             <a
                                 class="vut-action pdf"
@@ -1261,12 +1283,7 @@ $puedeAprobar = !empty($data['puede_aprobar']);
                                 onclick="verDetalleSolicitud(${id})"
                             >👁</button>
 
-                            <button
-                                type="button"
-                                class="vut-action state"
-                                title="Cambiar estado"
-                                onclick="abrirCambioEstado(${id}, '${vutDashEsc(estado)}')"
-                            >↺</button>
+                            ${estadoAction}
                         </div>
                     </td>
                 </tr>
@@ -1429,18 +1446,20 @@ $puedeAprobar = !empty($data['puede_aprobar']);
     }
 
     async function abrirCambioEstado(id, estadoActual) {
+        if (!window.VUT_DASHBOARD.puedeEditar) return;
+
         const puedeAprobar = window.VUT_DASHBOARD.puedeAprobar;
 
         const estados = Object.entries(window.VUT_DASHBOARD.estados)
-            .filter(([key]) => puedeAprobar || !['APROBADO', 'RECHAZADO', 'TERMINADO', 'CANCELADO'].includes(key));
+            .filter(([key]) => puedeAprobar || !['AUTORIZADO', 'ENTREGADO', 'CANCELADO'].includes(key));
 
         const options = estados.map(([key, label]) => `
             <option value="${vutDashEsc(key)}" ${key === estadoActual ? 'selected' : ''}>
-                ${vutDashEsc(key === 'APROBADO' ? 'Autorizado' : label)}
+                ${vutDashEsc(label)}
             </option>
         `).join('');
 
-        const estadoRequiereFirmaRecibido = (estado) => ['APROBADO', 'AUTORIZADO'].includes(String(estado || '').toUpperCase());
+        const estadoRequiereFirmaRecibido = (estado) => String(estado || '').toUpperCase() === 'AUTORIZADO';
         let firmaCanvas = null;
         let firmaCtx = null;
         let firmaDibujando = false;
@@ -1622,7 +1641,7 @@ $puedeAprobar = !empty($data['puede_aprobar']);
                 const estado = document.getElementById('swal-estado').value;
                 const observaciones = document.getElementById('swal-observaciones').value.trim();
 
-                if (['RECHAZADO', 'PREVENIDO', 'CANCELADO'].includes(estado) && observaciones.length < 5) {
+                if (['SUBSANE', 'PREVENCION', 'CANCELADO'].includes(estado) && observaciones.length < 5) {
                     Swal.showValidationMessage('Agrega una observación o motivo para este estado.');
                     return false;
                 }
@@ -1927,7 +1946,7 @@ $puedeAprobar = !empty($data['puede_aprobar']);
         const general = section('Datos generales', `
             <div class="vut-detail-grid">
                 <div class="vut-detail-field"><span class="label">Folio</span><span class="value">${vutDashEsc(data.folio || 'S/F')}</span></div>
-                <div class="vut-detail-field"><span class="label">Estado</span><span class="value">${vutDashEsc(estadoLabel(data.estado_proceso || 'NUEVO'))}</span></div>
+                <div class="vut-detail-field"><span class="label">Estado</span><span class="value">${vutDashEsc(estadoLabel(data.estado_proceso || 'INGRESADO'))}</span></div>
                 <div class="vut-detail-field"><span class="label">Fecha de ingreso</span><span class="value">${vutDashEsc(formatFecha(data.fecha_ingreso || data.fecha_creacion || '', true))}</span></div>
                 <div class="vut-detail-field"><span class="label">Estatus interno</span><span class="value">${vutDashEsc(data.estatus || 'N/A')}</span></div>
                 <div class="vut-detail-field"><span class="label">Materia</span><span class="value">${vutDashEsc(data.materia || '')}</span></div>
@@ -1958,6 +1977,16 @@ $puedeAprobar = !empty($data['puede_aprobar']);
             section('Firmas digitales', renderFirmas(firmas));
 
         const historialHtml = section('Historial de estados', renderHistorial(historial));
+        const accionesEdicion = window.VUT_DASHBOARD.puedeEditar
+            ? `
+                <a class="vut-btn vut-btn-light" href="index.php?route=ventanilla/editar&id=${encodeURIComponent(data.id_solicitud || data.id || '')}" style="text-decoration:none;">
+                    ✏️ Editar captura
+                </a>
+                <button type="button" class="vut-btn vut-btn-light" onclick="Swal.close(); abrirCambioEstado(${Number(data.id_solicitud || data.id || 0)}, '${vutDashEsc(data.estado_proceso || 'INGRESADO')}')">
+                    ↺ Cambiar estado
+                </button>
+            `
+            : '';
 
         return `
             <div style="text-align:left;">
@@ -1971,21 +2000,16 @@ $puedeAprobar = !empty($data['puede_aprobar']);
                         </div>
                     </div>
 
-                    <span class="estado-pill estado-${vutDashEsc(data.estado_proceso || 'NUEVO')}">
-                        ● ${vutDashEsc(estadoLabel(data.estado_proceso || 'NUEVO'))}
+                    <span class="estado-pill estado-${vutDashEsc(data.estado_proceso || 'INGRESADO')}">
+                        ● ${vutDashEsc(estadoLabel(data.estado_proceso || 'INGRESADO'))}
                     </span>
                 </div>
 
                 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
-                    <a class="vut-btn vut-btn-light" href="index.php?route=ventanilla/editar&id=${encodeURIComponent(data.id_solicitud || data.id || '')}" style="text-decoration:none;">
-                        ✏️ Editar captura
-                    </a>
+                    ${accionesEdicion}
                     <a class="vut-btn vut-btn-light" target="_blank" href="index.php?route=ventanilla/generarComprobante&id=${encodeURIComponent(data.id_solicitud || data.id || '')}" style="text-decoration:none;">
                         📄 Abrir acuse PDF
                     </a>
-                    <button type="button" class="vut-btn vut-btn-light" onclick="Swal.close(); abrirCambioEstado(${Number(data.id_solicitud || data.id || 0)}, '${vutDashEsc(data.estado_proceso || 'NUEVO')}')">
-                        ↺ Cambiar estado
-                    </button>
                 </div>
 
                 <div class="vut-detail-tabs">
