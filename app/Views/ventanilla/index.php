@@ -779,29 +779,43 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
             <div class="animate-fade-in">
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8 pt-2">
                     <div class="md:col-span-5">
-                        <label class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Nombre del Mercado Público <span class="text-red-500">*</span></label>
+                        <label class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Mercado o concentración <span class="text-red-500">*</span></label>
                         <select id="mercado_nombre" name="mercado_nombre" required class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200 bg-white">
-                            <option value="">Seleccione un mercado oficial...</option>
-                            <option value="0274 - ARTESANÍAS VASCO DE QUIROGA">0274 · ARTESANÍAS VASCO DE QUIROGA</option>
-                            <option value="0251 - COMIDAS HUIPULCO">0251 · COMIDAS HUIPULCO</option>
-                            <option value="0256 - DR. Y GRAL. JOSÉ GONZÁLEZ VARELA">0256 · DR. Y GRAL. JOSÉ GONZÁLEZ VARELA</option>
-                            <option value="0286 - FLORES SAN FERNANDO">0286 · FLORES SAN FERNANDO</option>
-                            <option value="0267 - FUENTES BROTANTES">0267 · FUENTES BROTANTES</option>
-                            <option value="0393 - HUESO PERIFÉRICO">0393 · HUESO PERIFÉRICO</option>
-                            <option value="0282 - ISIDRO FABELA">0282 · ISIDRO FABELA</option>
-                            <option value="0391 - JOSÉ MARÍA MORELOS Y PAVÓN">0391 · JOSÉ MARÍA MORELOS Y PAVÓN</option>
-                            <option value="0042 - LA PAZ">0042 · LA PAZ</option>
-                            <option value="0265 - LÁZARO CÁRDENAS">0265 · LÁZARO CÁRDENAS</option>
-                            <option value="0289 - MIGUEL HIDALGO">0289 · MIGUEL HIDALGO</option>
-                            <option value="1011 - MIRADOR">1011 · MIRADOR</option>
-                            <option value="0392 - PLAZA MEXICANA DEL SUR">0392 · PLAZA MEXICANA DEL SUR</option>
-                            <option value="0285 - SAN ANDRÉS TOTOLTEPEC">0285 · SAN ANDRÉS TOTOLTEPEC</option>
-                            <option value="0350 - SAN NICOLÁS TOTOLAPAN">0350 · SAN NICOLÁS TOTOLAPAN</option>
-                            <option value="0406 - TLALCOLIGIA">0406 · TLALCOLIGIA</option>
-                            <option value="0320 - TORRES DE PADIERNA">0320 · TORRES DE PADIERNA</option>
-                            <option value="0394 - VEINTICUATRO DE FEBRERO">0394 · VEINTICUATRO DE FEBRERO</option>
-                            <option value="1012 - VEINTIUNO DE ABRIL">1012 · VEINTIUNO DE ABRIL</option>
-                            <option value="0263 - VILLA COAPA">0263 · VILLA COAPA</option>
+                            <option value="">Seleccione un mercado o concentración...</option>
+                            <optgroup label="Mercados públicos (21)">
+                                <option value="0263 - VILLA COAPA">0263 · VILLA COAPA</option>
+                                <option value="0267 - FUENTES BROTANTES">0267 · FUENTES BROTANTES</option>
+                                <option value="0289 - MIGUEL HIDALGO">0289 · MIGUEL HIDALGO</option>
+                                <option value="0256 - DR. Y GRAL. JOSÉ GONZÁLEZ VARELA">0256 · DR. Y GRAL. JOSÉ GLEZ. VARELA</option>
+                                <option value="0265 - LÁZARO CÁRDENAS">0265 · LÁZARO CÁRDENAS</option>
+                                <option value="0286 - FLORES SAN FERNANDO">0286 · FLORES SAN FERNANDO</option>
+                                <option value="0285 - SAN ANDRÉS TOTOLTEPEC">0285 · SAN ANDRÉS TOTOLTEPEC</option>
+                                <option value="0392 - PLAZA MEXICANA DEL SUR">0392 · PLAZA MEXICANA DEL SUR</option>
+                                <option value="0320 - TORRES DE PADIERNA">0320 · TORRES DE PADIERNA</option>
+                                <option value="0350 - SAN NICOLÁS TOTOLAPAN">0350 · SAN NICOLÁS TOTOLAPAN</option>
+                                <option value="0394 - VEINTICUATRO DE FEBRERO">0394 · 24 DE FEBRERO</option>
+                                <option value="1012 - VEINTIUNO DE ABRIL">1012 · 21 DE ABRIL</option>
+                                <option value="1011 - MIRADOR">1011 · EL MIRADOR</option>
+                                <option value="0251 - COMIDAS HUIPULCO">0251 · COMIDAS HUIPULCO</option>
+                                <option value="0393 - HUESO PERIFÉRICO">0393 · HUESO PERIFÉRICO</option>
+                                <option value="0391 - JOSÉ MARÍA MORELOS Y PAVÓN">0391 · JOSÉ MA. MORELOS Y PAVÓN</option>
+                                <option value="0042 - LA PAZ">0042 · LA PAZ</option>
+                                <option value="0355 - MARGARITA MAZA DE JUÁREZ">0355 · MARGARITA MAZA DE JUÁREZ</option>
+                                <option value="0406 - TLALCOLIGIA">0406 · TLALCOLIGIA</option>
+                                <option value="0274 - ARTESANÍAS VASCO DE QUIROGA">0274 · ARTESANÍAS VASCO DE QUIROGA</option>
+                                <option value="0282 - ISIDRO FABELA">0282 · ISIDRO FABELA</option>
+                            </optgroup>
+                            <optgroup label="Concentraciones (9)">
+                                <option value="CONCENTRACIÓN - 22 DE ENERO">22 DE ENERO</option>
+                                <option value="CONCENTRACIÓN - SAN MIGUEL TOPILEJO">SAN MIGUEL TOPILEJO</option>
+                                <option value="CONCENTRACIÓN - 10 DE MAYO">10 DE MAYO</option>
+                                <option value="CONCENTRACIÓN - PEDREGAL DE LAS ÁGUILAS">PEDREGAL DE LAS ÁGUILAS</option>
+                                <option value="CONCENTRACIÓN - JOSÉ LÓPEZ PORTILLO">JOSÉ LÓPEZ PORTILLO</option>
+                                <option value="CONCENTRACIÓN - SANTÍSIMA TRINIDAD">SANTÍSIMA TRINIDAD</option>
+                                <option value="CONCENTRACIÓN - BENITO JUÁREZ TLALMILLE">BENITO JUÁREZ TLALMILLE</option>
+                                <option value="CONCENTRACIÓN - FLORES HUIPULCO">FLORES HUIPULCO</option>
+                                <option value="CONCENTRACIÓN - JACINTO KANEK">JACINTO KANEK</option>
+                            </optgroup>
                         </select>
                     </div>
                     <div class="md:col-span-2">
