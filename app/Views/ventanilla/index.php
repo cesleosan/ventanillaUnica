@@ -739,6 +739,45 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
                             class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-black text-right border-gray-200 text-emerald-700">
                     </div>
                 </div>
+
+                <div class="recibo-extra-manifestacion-bc hidden grid grid-cols-12 gap-4 items-center">
+                    <div class="col-span-8">
+                        <label for="folio_recibo_4" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Folio del Recibo</label>
+                        <input type="text" id="folio_recibo_4" name="folio_recibo_4" placeholder="No. Recibo"
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-bold border-gray-200 focus:border-emerald-500">
+                    </div>
+                    <div class="col-span-4">
+                        <label for="monto_recibo_4" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Cantidad</label>
+                        <input type="number" id="monto_recibo_4" name="monto_recibo_4" step="0.01"
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-black text-right border-gray-200 text-emerald-700">
+                    </div>
+                </div>
+
+                <div class="recibo-extra-manifestacion-bc hidden grid grid-cols-12 gap-4 items-center">
+                    <div class="col-span-8">
+                        <label for="folio_recibo_5" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Folio del Recibo</label>
+                        <input type="text" id="folio_recibo_5" name="folio_recibo_5" placeholder="No. Recibo"
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-bold border-gray-200 focus:border-emerald-500">
+                    </div>
+                    <div class="col-span-4">
+                        <label for="monto_recibo_5" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Cantidad</label>
+                        <input type="number" id="monto_recibo_5" name="monto_recibo_5" step="0.01"
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-black text-right border-gray-200 text-emerald-700">
+                    </div>
+                </div>
+
+                <div class="recibo-extra-manifestacion-bc hidden grid grid-cols-12 gap-4 items-center">
+                    <div class="col-span-8">
+                        <label for="folio_recibo_6" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Folio del Recibo</label>
+                        <input type="text" id="folio_recibo_6" name="folio_recibo_6" placeholder="No. Recibo"
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-bold border-gray-200 focus:border-emerald-500">
+                    </div>
+                    <div class="col-span-4">
+                        <label for="monto_recibo_6" class="block text-[9px] font-black text-gray-400 uppercase mb-1 ml-2">Cantidad</label>
+                        <input type="number" id="monto_recibo_6" name="monto_recibo_6" step="0.01"
+                            class="input-tlalpan w-full rounded-xl py-2.5 px-4 text-xs font-black text-right border-gray-200 text-emerald-700">
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -878,6 +917,15 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
                         <label class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Código Postal <span class="text-red-500">*</span></label>
                         <input type="text" id="mercado_cp" name="mercado_cp" placeholder="C.P." class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm text-center font-black border-gray-200">
                     </div>
+                </div>
+            </div>
+        `,
+        'servicios_legales': `
+            <div class="animate-fade-in border-t border-gray-100 pt-8 mt-8">
+                <div class="max-w-2xl">
+                    <label for="linea_captura" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Línea de captura</label>
+                    <input type="text" id="linea_captura" name="linea_captura" placeholder="Ingrese la línea de captura"
+                        class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-bold border-gray-200">
                 </div>
             </div>
         `,
@@ -1192,6 +1240,7 @@ function actualizarRequisitos() {
     let esTramiteObra = false;
     // Normalizamos el nombre para una búsqueda más segura (sin acentos/minúsculas)
     const tramiteNormalizado = tramite.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let esManifestacionBC = false;
 
     // 3. ACTIVACIÓN DE COMBOS ESPECÍFICOS
     if (tramite.includes("Publicitación Vecinal")) {
@@ -1210,6 +1259,7 @@ function actualizarRequisitos() {
              tramite.includes("Manifestación de Construcción Tipo C")) {
         if (conManBC) conManBC.classList.remove('hidden');
         esTramiteObra = true;
+        esManifestacionBC = true;
     }
     // CORRECCIÓN: Detección flexible para Espectáculos Públicos
     else if (tramiteNormalizado.includes("espectaculos publicos")) {
@@ -1241,6 +1291,16 @@ function actualizarRequisitos() {
         conRecibos.classList.remove('hidden');
     }
 
+    document.querySelectorAll('.recibo-extra-manifestacion-bc').forEach(fila => {
+        fila.classList.toggle('hidden', !esManifestacionBC);
+
+        if (!esManifestacionBC) {
+            fila.querySelectorAll('input').forEach(input => {
+                input.value = '';
+            });
+        }
+    });
+
     // --- 5. RENDERIZADO DE REQUISITOS ---
     const requisitos = dataTramite.requisitos ? dataTramite.requisitos : dataTramite;
     divReq.innerHTML = '';
@@ -1271,20 +1331,40 @@ function actualizarRequisitos() {
     const contenedorCaptura = document.getElementById('contenedor-dinamico-captura');
     const btnTabCaptura = document.getElementById('btn-predio'); 
 
-    // Habilitamos la pestaña solo cuando el catálogo declara una captura específica.
+    // Las materias de Mercados y Servicios Legales agregan sus datos propios sin
+    // reemplazar una plantilla específica existente (por ejemplo, vía pública o predio).
     const etiquetasCaptura = {
         mercado: 'DATOS DEL MERCADO',
         predio: 'DATOS DEL PREDIO',
-        via_publica: 'UBICACIÓN EN VÍA PÚBLICA'
+        via_publica: 'UBICACIÓN EN VÍA PÚBLICA',
+        servicios_legales: 'DATOS LEGALES'
     };
 
-    if (plantillasCaptura[tipo]) {
+    const tiposCaptura = [];
+
+    if (materia === 'Mercados') {
+        tiposCaptura.push('mercado');
+    }
+
+    if (tipo && plantillasCaptura[tipo] && !tiposCaptura.includes(tipo)) {
+        tiposCaptura.push(tipo);
+    }
+
+    if (materia === 'Servicios Legales' && !tiposCaptura.includes('servicios_legales')) {
+        tiposCaptura.push('servicios_legales');
+    }
+
+    if (tiposCaptura.length > 0) {
         if (btnTabCaptura) {
-            btnTabCaptura.classList.remove('hidden'); 
-            btnTabCaptura.innerText = etiquetasCaptura[tipo] || 'DATOS DE UBICACIÓN';
+            btnTabCaptura.classList.remove('hidden');
+            btnTabCaptura.innerText = materia === 'Mercados'
+                ? 'DATOS DEL MERCADO'
+                : (materia === 'Servicios Legales' ? 'DATOS DEL TRÁMITE' : (etiquetasCaptura[tipo] || 'DATOS DE UBICACIÓN'));
         }
         if (contenedorCaptura) {
-            contenedorCaptura.innerHTML = plantillasCaptura[tipo];
+            contenedorCaptura.innerHTML = tiposCaptura
+                .map(tipoCaptura => plantillasCaptura[tipoCaptura])
+                .join('');
         }
     } else {
         // Para Protección Civil y otros que no tengan tipo_captura: OCULTAR TODO
