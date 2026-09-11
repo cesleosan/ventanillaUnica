@@ -1,6 +1,8 @@
 <?php
 // app/Controllers/DashboardController.php
 
+require_once __DIR__ . '/../config/session.php';
+
 class DashboardController {
     private $db = null;
 
@@ -87,9 +89,7 @@ class DashboardController {
     }
 
     public function index() {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        vut_iniciar_sesion();
 
         $error = null;
 
@@ -114,15 +114,18 @@ class DashboardController {
                         if (!$usuario || !password_verify($password, (string)$usuario['password'])) {
                             $error = 'Usuario o contraseña incorrectos para VUT.';
                         } else {
+                            session_regenerate_id(true);
                             $this->iniciarSesionUsuario($usuario);
+                            unset($_SESSION['captcha_code']);
                             $this->registrarAcceso((int)$usuario['id']);
+                            session_write_close();
                             header('Location: index.php?route=ventanilla/dashboard');
                             exit;
                         }
                     }
                 }
             } elseif ($action === 'logout') {
-                session_destroy();
+                vut_cerrar_sesion();
                 header('Location: index.php?route=home');
                 exit;
             }

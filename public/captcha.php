@@ -1,6 +1,7 @@
 <?php
 // public/captcha.php
-session_start();
+require_once __DIR__ . '/../app/config/session.php';
+vut_iniciar_sesion();
 
 // 1. Generar código aleatorio
 $random_alpha = md5(rand());

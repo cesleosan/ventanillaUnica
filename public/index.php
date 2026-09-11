@@ -1,7 +1,8 @@
 <?php
 // public/index.php
 
-session_start();
+require_once __DIR__ . '/../app/config/session.php';
+vut_iniciar_sesion();
 
 require_once '../app/Controllers/DashboardController.php';
 require_once '../app/Controllers/VentanillaController.php';

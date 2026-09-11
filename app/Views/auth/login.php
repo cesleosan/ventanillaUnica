@@ -31,7 +31,7 @@
                     </div>
                 <?php endif; ?>
 
-                <form method="POST" action="/" class="space-y-5 sm:space-y-6">
+                <form method="POST" action="index.php?route=home" class="space-y-5 sm:space-y-6">
                     <input type="hidden" name="action" value="login">
 
                     <div>

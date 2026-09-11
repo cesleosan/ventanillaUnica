@@ -3,6 +3,8 @@
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
+require_once __DIR__ . '/../config/session.php';
+
 class VentanillaController {
 private $db;
 
@@ -25,9 +27,7 @@ private $db;
      * Usuario VUT autenticado en la sesión actual.
      */
     private function usuarioActualVut(): ?array {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        vut_iniciar_sesion();
 
         $usuario = $_SESSION['user'] ?? null;
 
@@ -1895,9 +1895,7 @@ private function prepararDatosParaAcuse(array $registro): array
  * Carga la vista principal de Ventanilla.
  */
 public function index() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     try {
         $usuario = $this->exigirUsuarioVut(false);
@@ -1935,9 +1933,7 @@ public function edit() {
 }
 
 public function editar() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     try {
         $usuario = $this->exigirUsuarioVut(false);
@@ -1989,9 +1985,7 @@ public function editar() {
  * Guarda cambios de una solicitud existente.
  */
 public function actualizar() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     header('Content-Type: application/json; charset=utf-8');
 
@@ -2071,9 +2065,7 @@ public function actualizar() {
  * Dashboard / bandeja principal de Ventanilla.
  */
 public function dashboard() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     try {
         $usuario = $this->exigirUsuarioVut(false);
@@ -2102,9 +2094,7 @@ public function dashboard() {
  * Endpoint AJAX del dashboard.
  */
 public function dashboardData() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     header('Content-Type: application/json; charset=utf-8');
 
@@ -2162,9 +2152,7 @@ public function dashboardData() {
  * Cambia el estado de una solicitud desde el dashboard.
  */
 public function cambiarEstado() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     header('Content-Type: application/json; charset=utf-8');
 
@@ -2246,9 +2234,7 @@ public function cambiarEstado() {
  * Detalle de una solicitud para modal del dashboard.
  */
 public function detalle() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     header('Content-Type: application/json; charset=utf-8');
 
@@ -2294,9 +2280,7 @@ public function detalle() {
  * Permisos básicos para estados finales.
  */
 private function puedeAprobarEstados(): bool {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+    vut_iniciar_sesion();
 
     $rol = $_SESSION['user']['rol']
         ?? $_SESSION['user']['role']

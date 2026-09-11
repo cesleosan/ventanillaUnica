@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../config/session.php';
+
 class UsuariosController {
     private $db;
 
@@ -13,9 +15,7 @@ class UsuariosController {
     }
 
     private function puedeAdministrar(): bool {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        vut_iniciar_sesion();
 
         $rol = strtolower((string)(
             $_SESSION['user']['rol']
@@ -40,9 +40,7 @@ class UsuariosController {
     }
 
     public function index(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        vut_iniciar_sesion();
 
         if (!$this->puedeAdministrar()) {
             http_response_code(403);
@@ -66,9 +64,7 @@ class UsuariosController {
     }
 
     public function guardar(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        vut_iniciar_sesion();
 
         if (!$this->puedeAdministrar()) {
             $this->json(['success' => false, 'error' => 'No tienes permisos para administrar usuarios VUT.'], 403);
@@ -87,9 +83,7 @@ class UsuariosController {
     }
 
     public function toggle(): void {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        vut_iniciar_sesion();
 
         if (!$this->puedeAdministrar()) {
             $this->json(['success' => false, 'error' => 'No tienes permisos para administrar usuarios VUT.'], 403);
