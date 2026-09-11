@@ -1340,9 +1340,16 @@ function actualizarRequisitos() {
         servicios_legales: 'DATOS LEGALES'
     };
 
+    const tramitesSinCatalogoMercados = new Set([
+        'Solicitud de exención del pago de derechos por ejercer el comercio en la vía pública',
+        'Permiso para ejercer el comercio en la vía pública personalísimo, temporal, revocable e intransferible y su renovación'
+    ]);
+    const ocultarCatalogoMercados = materia === 'Mercados'
+        && tramitesSinCatalogoMercados.has(tramite);
+
     const tiposCaptura = [];
 
-    if (materia === 'Mercados') {
+    if (materia === 'Mercados' && !ocultarCatalogoMercados) {
         tiposCaptura.push('mercado');
     }
 
@@ -1357,7 +1364,7 @@ function actualizarRequisitos() {
     if (tiposCaptura.length > 0) {
         if (btnTabCaptura) {
             btnTabCaptura.classList.remove('hidden');
-            btnTabCaptura.innerText = materia === 'Mercados'
+            btnTabCaptura.innerText = materia === 'Mercados' && !ocultarCatalogoMercados
                 ? 'DATOS DEL MERCADO'
                 : (materia === 'Servicios Legales' ? 'DATOS DEL TRÁMITE' : (etiquetasCaptura[tipo] || 'DATOS DE UBICACIÓN'));
         }
