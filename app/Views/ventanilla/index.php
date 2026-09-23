@@ -10,6 +10,12 @@ $modoEdicionVUT = !empty($data['modo_edicion']);
 $idSolicitudEdicionVUT = (int)($data['id_solicitud'] ?? 0);
 $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solicitud_edit'])) ? $data['solicitud_edit'] : [];
 ?>
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
 <style>
     /* Scrollbar Institucional */
     .custom-scrollbar::-webkit-scrollbar {
@@ -42,6 +48,24 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
     .text-tlalpan-vino { color: #773357; }
     .border-tlalpan-vino { border-color: #773357; }
     .bg-tlalpan-vino { background-color: #773357; }
+
+    #vut-mapa-ubicacion {
+        width: 100%;
+        height: 430px;
+        border-radius: 1rem;
+        background: #f3f4f6;
+        z-index: 1;
+    }
+
+    #vut-mapa-ubicacion .leaflet-control-attribution {
+        font-size: 9px;
+    }
+
+    @media (max-width: 640px) {
+        #vut-mapa-ubicacion {
+            height: 340px;
+        }
+    }
 </style>
 <style>
     .vut-input-error {
@@ -682,8 +706,49 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
         </div>
 
         <div id="tab-predio" class="tab-content hidden">
-            <div id="contenedor-dinamico-captura" class="animate-fade-in">
+            <div id="contenedor-dinamico-captura" class="animate-fade-in"></div>
+
+            <section id="vut-seccion-mapa" class="mt-8 rounded-3xl border border-[#E6D4DD] bg-[#FCF7F9]/60 p-5 sm:p-6 animate-fade-in">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between mb-5">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-tlalpan-vino">Ubicación geográfica del permiso</p>
+                        <h4 class="mt-1 text-lg font-black text-gray-800">Marca el punto exacto en el mapa <span class="text-red-500">*</span></h4>
+                        <p class="mt-1 max-w-3xl text-xs font-semibold leading-relaxed text-gray-500">
+                            Haz clic sobre el mapa o arrastra el marcador. Las coordenadas se guardarán dentro del registro de la solicitud.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="vut-marcar-centro-mapa" class="rounded-xl border border-[#D8B7C8] bg-white px-4 py-2 text-[10px] font-black uppercase tracking-wider text-tlalpan-vino hover:bg-[#F5EAF0] transition-colors">
+                            Marcar centro visible
+                        </button>
+                        <button type="button" id="vut-limpiar-mapa" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-wider text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors">
+                            Limpiar punto
+                        </button>
+                    </div>
                 </div>
+
+                <div id="vut-mapa-ubicacion" role="application" aria-label="Mapa para seleccionar la ubicación del permiso"></div>
+                <p id="vut-mapa-error" class="hidden mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800"></p>
+
+                <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-12 md:items-end">
+                    <div class="md:col-span-4">
+                        <label for="ubicacion_latitud" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Latitud <span class="text-red-500">*</span></label>
+                        <input type="text" id="ubicacion_latitud" name="ubicacion_latitud" required inputmode="decimal" autocomplete="off" placeholder="Ej. 19.288500" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-black text-center border-gray-200 bg-white">
+                    </div>
+                    <div class="md:col-span-4">
+                        <label for="ubicacion_longitud" class="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-wider">Longitud <span class="text-red-500">*</span></label>
+                        <input type="text" id="ubicacion_longitud" name="ubicacion_longitud" required inputmode="decimal" autocomplete="off" placeholder="Ej. -99.167300" class="input-tlalpan w-full rounded-xl py-3 px-4 text-sm font-black text-center border-gray-200 bg-white">
+                    </div>
+                    <div class="md:col-span-4">
+                        <div id="vut-estado-ubicacion" class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-400">
+                            Punto pendiente de seleccionar
+                        </div>
+                        <a id="vut-abrir-mapa" href="#" target="_blank" rel="noopener noreferrer" class="hidden mt-2 text-center text-[10px] font-black uppercase tracking-wider text-tlalpan-vino hover:underline">
+                            Abrir punto en otra pestaña
+                        </a>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <div id="tab-observaciones" class="tab-content hidden">
@@ -1170,6 +1235,9 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
     const divReq = document.getElementById('lista-requisitos');
     const divPres = document.getElementById('lista-presentados');
     const placeholder = document.getElementById('placeholder-presentados');
+    const VUT_CENTRO_TLALPAN = [19.2885, -99.1673];
+    let vutMapaUbicacion = null;
+    let vutMarcadorUbicacion = null;
 
     // Inicialización
     window.onload = function() { 
@@ -1191,6 +1259,199 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
         const activeBtn = document.getElementById('btn-' + tabId);
         activeBtn.classList.remove('border-transparent', 'text-gray-400', 'font-bold');
         activeBtn.classList.add('border-tlalpan-vino', 'text-tlalpan-vino', 'font-black');
+
+        if (tabId === 'predio') {
+            setTimeout(vutInicializarMapaUbicacion, 50);
+        }
+    }
+
+    function vutValorCoordenada(value) {
+        const normalized = String(value ?? '').trim().replace(',', '.');
+        if (normalized === '') return null;
+
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : null;
+    }
+
+    function vutCoordenadasValidas(latitud, longitud) {
+        return latitud !== null
+            && longitud !== null
+            && latitud >= -90
+            && latitud <= 90
+            && longitud >= -180
+            && longitud <= 180;
+    }
+
+    function vutActualizarEstadoUbicacion(latitud = null, longitud = null) {
+        const estado = document.getElementById('vut-estado-ubicacion');
+        const enlace = document.getElementById('vut-abrir-mapa');
+        const seleccionada = vutCoordenadasValidas(latitud, longitud);
+
+        if (estado) {
+            estado.className = seleccionada
+                ? 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider text-emerald-700'
+                : 'rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-center text-[10px] font-black uppercase tracking-wider text-gray-400';
+            estado.textContent = seleccionada
+                ? 'Punto seleccionado correctamente'
+                : 'Punto pendiente de seleccionar';
+        }
+
+        if (enlace) {
+            if (seleccionada) {
+                const lat = latitud.toFixed(6);
+                const lng = longitud.toFixed(6);
+                enlace.href = `https://www.openstreetmap.org/?mlat=${encodeURIComponent(lat)}&mlon=${encodeURIComponent(lng)}#map=18/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}`;
+                enlace.classList.remove('hidden');
+            } else {
+                enlace.href = '#';
+                enlace.classList.add('hidden');
+            }
+        }
+    }
+
+    function vutColocarPuntoMapa(latitud, longitud, centrar = true, actualizarCampos = true) {
+        if (!vutCoordenadasValidas(latitud, longitud)) return false;
+
+        const latInput = document.getElementById('ubicacion_latitud');
+        const lngInput = document.getElementById('ubicacion_longitud');
+
+        if (actualizarCampos) {
+            if (latInput) latInput.value = latitud.toFixed(6);
+            if (lngInput) lngInput.value = longitud.toFixed(6);
+
+            [latInput, lngInput].forEach(input => {
+                if (!input) return;
+                input.classList.remove('vut-input-error');
+                input.classList.add('vut-input-ok');
+                const error = input.nextElementSibling;
+                if (error && error.classList.contains('vut-error-msg')) error.remove();
+            });
+        }
+
+        if (vutMapaUbicacion && window.L) {
+            if (!vutMarcadorUbicacion) {
+                vutMarcadorUbicacion = window.L.marker([latitud, longitud], {
+                    draggable: true,
+                    title: 'Ubicación del permiso'
+                }).addTo(vutMapaUbicacion);
+
+                vutMarcadorUbicacion.on('dragend', event => {
+                    const punto = event.target.getLatLng();
+                    vutColocarPuntoMapa(punto.lat, punto.lng, false, true);
+                });
+            } else {
+                vutMarcadorUbicacion.setLatLng([latitud, longitud]);
+            }
+
+            vutMarcadorUbicacion
+                .bindPopup(`<strong>Ubicación del permiso</strong><br>${latitud.toFixed(6)}, ${longitud.toFixed(6)}`)
+                .openPopup();
+
+            if (centrar) {
+                vutMapaUbicacion.setView([latitud, longitud], Math.max(vutMapaUbicacion.getZoom(), 16));
+            }
+        }
+
+        vutActualizarEstadoUbicacion(latitud, longitud);
+        return true;
+    }
+
+    function vutSincronizarMapaDesdeCampos() {
+        const latitud = vutValorCoordenada(document.getElementById('ubicacion_latitud')?.value);
+        const longitud = vutValorCoordenada(document.getElementById('ubicacion_longitud')?.value);
+
+        if (vutCoordenadasValidas(latitud, longitud)) {
+            vutColocarPuntoMapa(latitud, longitud, true, true);
+        } else {
+            vutActualizarEstadoUbicacion();
+        }
+    }
+
+    function vutLimpiarUbicacionMapa(restablecerVista = true) {
+        const latInput = document.getElementById('ubicacion_latitud');
+        const lngInput = document.getElementById('ubicacion_longitud');
+
+        [latInput, lngInput].forEach(input => {
+            if (!input) return;
+            input.value = '';
+            input.classList.remove('vut-input-ok', 'vut-input-error');
+            const error = input.nextElementSibling;
+            if (error && error.classList.contains('vut-error-msg')) error.remove();
+        });
+
+        if (vutMapaUbicacion && vutMarcadorUbicacion) {
+            vutMapaUbicacion.removeLayer(vutMarcadorUbicacion);
+            vutMarcadorUbicacion = null;
+        }
+
+        if (vutMapaUbicacion && restablecerVista) {
+            vutMapaUbicacion.setView(VUT_CENTRO_TLALPAN, 12);
+        }
+
+        vutActualizarEstadoUbicacion();
+    }
+
+    function vutInicializarMapaUbicacion() {
+        const contenedor = document.getElementById('vut-mapa-ubicacion');
+        const error = document.getElementById('vut-mapa-error');
+        if (!contenedor) return;
+
+        if (!window.L) {
+            if (error) {
+                error.textContent = 'No fue posible cargar el mapa. Puedes capturar las coordenadas manualmente y volver a intentarlo cuando haya conexión.';
+                error.classList.remove('hidden');
+            }
+            return;
+        }
+
+        if (error) error.classList.add('hidden');
+
+        if (!vutMapaUbicacion) {
+            vutMapaUbicacion = window.L.map(contenedor, {
+                zoomControl: true,
+                minZoom: 9,
+                maxZoom: 19
+            }).setView(VUT_CENTRO_TLALPAN, 12);
+
+            window.L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                subdomains: 'abc',
+                attribution: '&copy; OpenStreetMap contributors, estilo HOT'
+            }).addTo(vutMapaUbicacion);
+
+            vutMapaUbicacion.on('click', event => {
+                vutColocarPuntoMapa(event.latlng.lat, event.latlng.lng, false, true);
+            });
+
+            const btnCentro = document.getElementById('vut-marcar-centro-mapa');
+            const btnLimpiar = document.getElementById('vut-limpiar-mapa');
+            const latInput = document.getElementById('ubicacion_latitud');
+            const lngInput = document.getElementById('ubicacion_longitud');
+
+            if (btnCentro && btnCentro.dataset.vutBound !== 'true') {
+                btnCentro.addEventListener('click', () => {
+                    const centro = vutMapaUbicacion.getCenter();
+                    vutColocarPuntoMapa(centro.lat, centro.lng, false, true);
+                });
+                btnCentro.dataset.vutBound = 'true';
+            }
+
+            if (btnLimpiar && btnLimpiar.dataset.vutBound !== 'true') {
+                btnLimpiar.addEventListener('click', () => vutLimpiarUbicacionMapa(true));
+                btnLimpiar.dataset.vutBound = 'true';
+            }
+
+            [latInput, lngInput].forEach(input => {
+                if (!input || input.dataset.vutMapBound === 'true') return;
+                input.addEventListener('change', vutSincronizarMapaDesdeCampos);
+                input.dataset.vutMapBound = 'true';
+            });
+        }
+
+        setTimeout(() => {
+            vutMapaUbicacion.invalidateSize();
+            vutSincronizarMapaDesdeCampos();
+        }, 80);
     }
 
     function actualizarTramites() {
@@ -1208,6 +1469,8 @@ $solicitudEdicionVUT = (isset($data['solicitud_edit']) && is_array($data['solici
     }
 
 function actualizarRequisitos() {
+    vutLimpiarUbicacionMapa(false);
+
     // 1. DEFINIR REFERENCIAS
     const conObra = document.getElementById('contenedor-tipo-obra'); 
     const conLic = document.getElementById('contenedor-tipo-licencia'); 
@@ -1361,28 +1624,19 @@ function actualizarRequisitos() {
         tiposCaptura.push('servicios_legales');
     }
 
-    if (tiposCaptura.length > 0) {
-        if (btnTabCaptura) {
-            btnTabCaptura.classList.remove('hidden');
-            btnTabCaptura.innerText = materia === 'Mercados' && !ocultarCatalogoMercados
-                ? 'DATOS DEL MERCADO'
-                : (materia === 'Servicios Legales' ? 'DATOS DEL TRÁMITE' : (etiquetasCaptura[tipo] || 'DATOS DE UBICACIÓN'));
-        }
-        if (contenedorCaptura) {
-            contenedorCaptura.innerHTML = tiposCaptura
-                .map(tipoCaptura => plantillasCaptura[tipoCaptura])
-                .join('');
-        }
-    } else {
-        // Para Protección Civil y otros que no tengan tipo_captura: OCULTAR TODO
-        if (btnTabCaptura) btnTabCaptura.classList.add('hidden'); 
-        if (contenedorCaptura) contenedorCaptura.innerHTML = ''; 
+    if (btnTabCaptura) {
+        btnTabCaptura.classList.remove('hidden');
+        btnTabCaptura.innerText = materia === 'Mercados' && !ocultarCatalogoMercados
+            ? 'DATOS DEL MERCADO'
+            : (materia === 'Servicios Legales'
+                ? 'DATOS DEL TRÁMITE'
+                : (etiquetasCaptura[tipo] || 'UBICACIÓN EN MAPA'));
+    }
 
-        // Si el usuario estaba en la pestaña de ubicación, lo devolvemos a requisitos
-        const tabUbicacion = document.getElementById('tab-predio');
-        if (tabUbicacion && !tabUbicacion.classList.contains('hidden')) {
-            switchTab('requisitos');
-        }
+    if (contenedorCaptura) {
+        contenedorCaptura.innerHTML = tiposCaptura
+            .map(tipoCaptura => plantillasCaptura[tipoCaptura])
+            .join('');
     }
 
     // --- 7. ACTUALIZACIÓN FINAL ---
@@ -1785,7 +2039,7 @@ function inspeccionarData() {
         interesado_dinamico: recolectarInputs('contenedor-dinamico-interesado'),
         representante_legal: recolectarInputs('tab-legal'),
         persona_autorizada: recolectarInputs('tab-autorizada'),
-        ubicacion_objeto: recolectarInputs('contenedor-dinamico-captura'),
+        ubicacion_objeto: recolectarInputs('tab-predio'),
         bifurcacion: recolectarBifurcacion(),
         recibos_validos: recolectarRecibosValidos(),
         requisitos: Array.from(document.querySelectorAll('#lista-presentados .item-requisito'))
@@ -2214,7 +2468,7 @@ async function finalizarCaptura(event) {
             representante_legal: recolectarInputs('tab-legal'),
             persona_autorizada: recolectarInputs('tab-autorizada'),
 
-            especificos: recolectarInputs('contenedor-dinamico-captura'),
+            especificos: recolectarInputs('tab-predio'),
 
             // IMPORTANTE:
             // Ya no usamos recolectarInputs aquí porque mandaba 0.00 aunque no existiera recibo.
@@ -2590,6 +2844,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function vutTipoCampo(el) {
         const key = vutCampoKey(el);
 
+        if (key === 'ubicacion_latitud') return 'latitud';
+        if (key === 'ubicacion_longitud') return 'longitud';
+
         if (key.includes('email') || key.includes('correo') || key.includes('e_mail')) return 'email';
 
         if (
@@ -2642,6 +2899,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const tipo = vutTipoCampo(el);
         let value = el.value || '';
+
+        if (tipo === 'latitud' || tipo === 'longitud') {
+            value = value.replace(',', '.').replace(/[^0-9.\-]/g, '');
+
+            const negativo = value.startsWith('-');
+            value = value.replace(/-/g, '');
+            const partes = value.split('.');
+            value = partes.shift() + (partes.length ? '.' + partes.join('').slice(0, 8) : '');
+            el.value = (negativo ? '-' : '') + value.slice(0, 15);
+            return;
+        }
 
         if (tipo === 'telefono') {
             el.value = value.replace(/\D/g, '').slice(0, 10);
@@ -2794,6 +3062,16 @@ document.addEventListener('DOMContentLoaded', () => {
             result = { ok: false, mensaje: 'El número exterior no debe exceder 20 caracteres.' };
         } else if (tipo === 'nombre_persona' && value.length < 2) {
             result = { ok: false, mensaje: 'Ingresa al menos 2 caracteres.' };
+        } else if (tipo === 'latitud') {
+            const latitud = Number(value.replace(',', '.'));
+            if (!Number.isFinite(latitud) || latitud < -90 || latitud > 90) {
+                result = { ok: false, mensaje: 'La latitud debe ser un número entre -90 y 90.' };
+            }
+        } else if (tipo === 'longitud') {
+            const longitud = Number(value.replace(',', '.'));
+            if (!Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
+                result = { ok: false, mensaje: 'La longitud debe ser un número entre -180 y 180.' };
+            }
         }
 
         if (!result.ok && mostrarError) {
@@ -2810,6 +3088,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function vutNormalizarValorPayload(el, value) {
         const tipo = vutTipoCampo(el);
         value = String(value || '').trim();
+
+        if (tipo === 'latitud' || tipo === 'longitud') {
+            const coordenada = Number(value.replace(',', '.'));
+            return Number.isFinite(coordenada) ? coordenada.toFixed(6) : value;
+        }
 
         if (tipo === 'telefono' || tipo === 'cp') {
             return value.replace(/\D/g, '');
@@ -2840,6 +3123,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.inputMode = 'numeric';
                 el.maxLength = 10;
                 el.placeholder = el.placeholder || '10 dígitos';
+            } else if (tipo === 'latitud' || tipo === 'longitud') {
+                el.type = 'text';
+                el.inputMode = 'decimal';
+                el.maxLength = 16;
             } else if (tipo === 'cp') {
                 el.type = 'text';
                 el.inputMode = 'numeric';
@@ -2949,7 +3236,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'tab-interesado',
             'tab-legal',
             'tab-autorizada',
-            'contenedor-dinamico-captura',
+            'tab-predio',
             'contenedor-recibos-dinamico',
             'tab-observaciones'
         ];
@@ -3089,6 +3376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chk.checked = false;
         });
 
+        vutLimpiarUbicacionMapa(true);
         actualizarSeccionPropietario();
 
         if (typeof window.switchTab === 'function') {
@@ -3110,7 +3398,7 @@ document.addEventListener('DOMContentLoaded', () => {
             interesado_dinamico: vutRecolectarInputs('contenedor-dinamico-interesado'),
             representante_legal: vutRecolectarInputs('tab-legal'),
             persona_autorizada: vutRecolectarInputs('tab-autorizada'),
-            ubicacion_objeto: vutRecolectarInputs('contenedor-dinamico-captura'),
+            ubicacion_objeto: vutRecolectarInputs('tab-predio'),
             bifurcacion: typeof window.recolectarBifurcacion === 'function' ? window.recolectarBifurcacion() : {},
             recibos_validos: typeof window.recolectarRecibosValidos === 'function' ? window.recolectarRecibosValidos() : {},
             requisitos: Array.from(document.querySelectorAll('#lista-presentados .item-requisito'))
@@ -3457,7 +3745,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 representante_legal: vutRecolectarInputs('tab-legal'),
                 persona_autorizada: vutRecolectarInputs('tab-autorizada'),
-                especificos: vutRecolectarInputs('contenedor-dinamico-captura'),
+                especificos: vutRecolectarInputs('tab-predio'),
 
                 recibos: typeof window.recolectarRecibosValidos === 'function'
                     ? window.recolectarRecibosValidos()

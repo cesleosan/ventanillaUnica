@@ -331,6 +331,7 @@ class Ventanilla {
                 'MERCADO_',
                 'VIA_PUBLICA_',
                 'PREDIO_',
+                'UBICACION_',
                 'PROPIETARIO_',
                 'BIFURCACION_',
                 'FOLIO_RECIBO_',
@@ -339,6 +340,7 @@ class Ventanilla {
                 '-'
             ],
             [
+                '',
                 '',
                 '',
                 '',
@@ -367,6 +369,7 @@ class Ventanilla {
         if (strpos($key, 'MERCADO_') === 0) return 'mercado';
         if (strpos($key, 'VIA_PUBLICA_') === 0) return 'via_publica';
         if (strpos($key, 'PREDIO_') === 0) return 'predio';
+        if (strpos($key, 'UBICACION_') === 0) return 'ubicacion_mapa';
 
         return 'especificos';
     }

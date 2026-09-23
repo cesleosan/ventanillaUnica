@@ -1006,6 +1006,64 @@ private function enriquecerPayloadFechasEntrega(array $payload): array {
     return $payload;
 }
 
+/**
+ * Exige y normaliza el punto geográfico seleccionado por el capturista.
+ * Las coordenadas quedan tanto en específicos (para el detalle EAV) como en
+ * una sección propia del payload principal de la solicitud.
+ */
+private function validarYNormalizarUbicacionMapa(array $payload): array {
+    $especificos = $payload['especificos'] ?? [];
+
+    if (!is_array($especificos)) {
+        $especificos = [];
+    }
+
+    $latitudRaw = $especificos['UBICACION_LATITUD']
+        ?? $especificos['ubicacion_latitud']
+        ?? null;
+    $longitudRaw = $especificos['UBICACION_LONGITUD']
+        ?? $especificos['ubicacion_longitud']
+        ?? null;
+
+    $latitudNormalizada = str_replace(',', '.', trim((string)$latitudRaw));
+    $longitudNormalizada = str_replace(',', '.', trim((string)$longitudRaw));
+
+    if ($latitudNormalizada === '' || $longitudNormalizada === '') {
+        throw new \Exception('Selecciona en el mapa la ubicación exacta del permiso.');
+    }
+
+    if (!is_numeric($latitudNormalizada) || !is_numeric($longitudNormalizada)) {
+        throw new \Exception('Las coordenadas de la ubicación no tienen un formato válido.');
+    }
+
+    $latitud = (float)$latitudNormalizada;
+    $longitud = (float)$longitudNormalizada;
+
+    if ($latitud < -90 || $latitud > 90) {
+        throw new \Exception('La latitud de la ubicación debe estar entre -90 y 90.');
+    }
+
+    if ($longitud < -180 || $longitud > 180) {
+        throw new \Exception('La longitud de la ubicación debe estar entre -180 y 180.');
+    }
+
+    $latitudFinal = number_format($latitud, 6, '.', '');
+    $longitudFinal = number_format($longitud, 6, '.', '');
+
+    unset($especificos['ubicacion_latitud'], $especificos['ubicacion_longitud']);
+    $especificos['UBICACION_LATITUD'] = $latitudFinal;
+    $especificos['UBICACION_LONGITUD'] = $longitudFinal;
+
+    $payload['especificos'] = $especificos;
+    $payload['ubicacion_mapa'] = [
+        'latitud' => $latitudFinal,
+        'longitud' => $longitudFinal,
+        'proveedor_mapa' => 'OpenStreetMap / HOT'
+    ];
+
+    return $payload;
+}
+
    public function guardar() {
     /**
      * Guarda la solicitud completa recibida desde JS.
@@ -1061,6 +1119,8 @@ private function enriquecerPayloadFechasEntrega(array $payload): array {
         if (empty($payload['solicitud']['tramite'])) {
             throw new \Exception("No se recibió el trámite de la solicitud.");
         }
+
+        $payload = $this->validarYNormalizarUbicacionMapa($payload);
 
         $payload['auditoria']['capturado_por'] = [
             'id' => (int)$usuario['id'],
@@ -2009,6 +2069,8 @@ public function actualizar() {
         $this->exigirAccesoSolicitud($idSolicitud, true);
 
         unset($payload['id_solicitud'], $payload['id']);
+
+        $payload = $this->validarYNormalizarUbicacionMapa($payload);
 
         $modelo = new \Ventanilla($this->db);
 
